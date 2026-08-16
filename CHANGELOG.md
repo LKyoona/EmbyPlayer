@@ -1,3 +1,7 @@
+## 0.8.3.5
+- Fixed the leaked mouse capture on a closed selector ComboBox: after a selector was dismissed programmatically the ComboBox kept WPF mouse capture, so every later click (fullscreen button included) routed into the dead ComboBox until some random interaction released it — perceived as "buttons dead for a while". A stuck capture is now released on the very next click and that click is re-dispatched to the control actually under the cursor, so switching selectors or hitting fullscreen responds instantly.
+- Pause/Play now commands LibVLC before painting UI feedback; the previous Render-priority yield deferred the real pause by a frame while the UI already showed "paused" (audio kept sounding after the picture froze).
+
 ## 0.8.3.4
 - Fixed player buttons that "sometimes did not respond":
   - The 3-second auto-hide no longer fades the control bar out from under a stationary cursor resting on it (left controls, slider, title bar, episode panel). Previously that click fell through to the video and toggled playback instead of hitting the button.

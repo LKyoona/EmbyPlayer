@@ -9,7 +9,7 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <AssemblyName>EmbyRemotePlayer</AssemblyName>
     <RootNamespace>EmbyRemotePlayer</RootNamespace>
-    <Version>0.8.3.4</Version>
+    <Version>0.8.3.5</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\emby.ico</ApplicationIcon>
     <InvariantGlobalization>false</InvariantGlobalization>

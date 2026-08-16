@@ -642,19 +642,14 @@ public partial class PlayerWindow : Window
 
     private async void ReportTimer_Tick(object? sender, EventArgs e) => await ReportProgressSafeAsync("TimeUpdate");
 
-    private async void TogglePlayback(bool showGesture)
+    private void TogglePlayback(bool showGesture)
     {
         if (_closing || _media is null) return;
 
-        // Paint the user's intent first. LibVLC can occasionally spend a frame or two in Pause/Play;
-        // yielding through Render makes the feedback visible in the same visual frame as the click.
+        // Command LibVLC first. Yielding a Render frame before Pause()/Play() used to defer the
+        // real state change while the UI already showed "paused" — audio kept playing a beat
+        // after the picture froze. Feedback paints right after the call returns, same frame.
         var willPause = _mediaPlayer.IsPlaying;
-        if (showGesture) ShowPlaybackGesture(paused: willPause);
-        SetPlayPauseVisual(isPlaying: !willPause);
-        if (showGesture)
-            await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
-
-        if (_closing || _media is null) return;
         if (willPause)
         {
             _mediaPlayer.Pause();
@@ -669,6 +664,9 @@ public partial class PlayerWindow : Window
             }
             _ = ReportProgressSafeAsync("Unpause");
         }
+
+        if (showGesture) ShowPlaybackGesture(paused: willPause);
+        SetPlayPauseVisual(isPlaying: !willPause);
     }
 
     private void SetPlayPauseVisual(bool isPlaying) => _viewModel.IsPlaying = isPlaying;
@@ -1944,11 +1942,40 @@ public partial class PlayerWindow : Window
 
     private void Window_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (!IsAnySelectorPopupOpen())
+        if (IsAnySelectorPopupOpen())
         {
-            ReleaseStaleMouseCapture();
+            HandleClickWithSelectorOpen(e);
             return;
         }
+
+        // A closed selector ComboBox can keep the mouse capture after its popup was dismissed
+        // programmatically (e.g. switch or dismissal clicks). While captured, every physical
+        // click routes into that dead ComboBox — fullscreen/selector buttons appear unresponsive
+        // "for a while". Detect, release, and re-dispatch this click to the real target so the
+        // user never needs a spare click to revive the player.
+        if (TryReleaseStuckMouseCapture() && GetCursorPos(out var revive))
+        {
+            e.Handled = true;
+            var selector = GetSelectorAtScreenPoint(revive);
+            if (selector is not null)
+            {
+                if (EpisodePanel.Visibility == Visibility.Visible) SetEpisodePanelOpen(false);
+                selector.SetCurrentValue(ComboBox.IsDropDownOpenProperty, true);
+                ShowPlaybackChrome();
+                return;
+            }
+
+            var button = GetPlayerButtonAtScreenPoint(revive);
+            if (button is not null)
+            {
+                Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() => RaisePlayerButtonClick(button)));
+                return;
+            }
+        }
+    }
+
+    private void HandleClickWithSelectorOpen(MouseButtonEventArgs e)
+    {
         if (!GetCursorPos(out var cursor)) return;
 
         // A native WPF ComboBox captures the mouse while its popup is open. Because of that,
@@ -1975,14 +2002,7 @@ public partial class PlayerWindow : Window
         {
             CloseSelectorPopupsExcept(null);
             e.Handled = true;
-            Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
-            {
-                if (_closing || !targetButton.IsEnabled || targetButton.Visibility != Visibility.Visible) return;
-                targetButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent, targetButton));
-                var command = targetButton.Command;
-                var parameter = targetButton.CommandParameter;
-                if (command is not null && command.CanExecute(parameter)) command.Execute(parameter);
-            }));
+            Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() => RaisePlayerButtonClick(targetButton)));
             return;
         }
 
@@ -1993,23 +2013,42 @@ public partial class PlayerWindow : Window
         e.Handled = true;
     }
 
-    private void ReleaseStaleMouseCapture()
+    private void RaisePlayerButtonClick(Button button)
     {
-        if (Mouse.Captured is not FrameworkElement captured) return;
-        if (!GetCursorPos(out var cursor)) return;
+        if (_closing || !button.IsEnabled || button.Visibility != Visibility.Visible) return;
+        button.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent, button));
+        var command = button.Command;
+        var parameter = button.CommandParameter;
+        if (command is not null && command.CanExecute(parameter)) command.Execute(parameter);
+    }
+
+    /// <summary>
+    /// Releases mouse captures that would otherwise eat clicks: a player selector ComboBox
+    /// holding capture while its popup is already closed, or any capture whose owner is far
+    /// from the physical cursor (e.g. a seek thumb whose mouse-up was swallowed by the
+    /// LibVLC child HWND). Returns true when a stuck capture was released.
+    /// </summary>
+    private bool TryReleaseStuckMouseCapture()
+    {
+        if (Mouse.Captured is ComboBox { IsDropDownOpen: false } combo && IsPlayerSelector(combo))
+        {
+            Mouse.Capture(null);
+            return true;
+        }
+
+        if (Mouse.Captured is not FrameworkElement captured) return false;
+        if (!GetCursorPos(out var cursor)) return false;
 
         try
         {
-            // A live drag keeps the captured thumb under/near the cursor. A capture whose owner
-            // is far away is stale — typically the mouse-up got swallowed by the LibVLC child
-            // HWND mid-drag — and silently eats every subsequent click in the window.
             var local = captured.PointFromScreen(new System.Windows.Point(cursor.X, cursor.Y));
             var bounds = new Rect(-80, -80, captured.ActualWidth + 160, captured.ActualHeight + 160);
-            if (bounds.Contains(local)) return;
+            if (bounds.Contains(local)) return false;
         }
         catch { }
 
         Mouse.Capture(null);
+        return true;
     }
 
     private ComboBox? GetSelectorAtScreenPoint(NativePoint point)
