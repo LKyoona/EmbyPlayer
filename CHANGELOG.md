@@ -1,3 +1,6 @@
+## 0.8.2.24
+- Card images now use aspect-correct letterboxing (Stretch=Uniform) on the dark tile instead of hard-cropping. Fallback artwork with mismatched aspect ratios (16:9 backdrops in 2:3 poster tiles, series posters in 16:9 episode tiles) previously lost most of the image to cropping; they now display complete with dark bars.
+
 ## 0.8.2.23
 - Resilience against flaky (often shared) Emby servers that answer image requests with 500/404:
   - Image downloads are no longer retried — a failing image previously fired three requests each (attempt + 2 retries), tripling load and error counts.
