@@ -137,6 +137,11 @@ public partial class PlayerWindow : Window
             volumeChanged: ApplyVolumeFromViewModel);
         DataContext = _viewModel;
         _viewModel.Volume = settings.PreferredVolume;
+        // A pointer resting anywhere on the chrome (left controls, slider, title bar, episode
+        // panel) must keep the chrome alive; without this the 3s timer faded controls out from
+        // under a stationary cursor and the next click fell through to the video surface.
+        _viewModel.KeepVisibleCheck = () =>
+            ControlsPanel.IsMouseOver || TitleBarPanel.IsMouseOver || EpisodePanel.Visibility == Visibility.Visible;
 
         ResetPlanState(plan);
     }
@@ -1939,7 +1944,11 @@ public partial class PlayerWindow : Window
 
     private void Window_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (!IsAnySelectorPopupOpen()) return;
+        if (!IsAnySelectorPopupOpen())
+        {
+            ReleaseStaleMouseCapture();
+            return;
+        }
         if (!GetCursorPos(out var cursor)) return;
 
         // A native WPF ComboBox captures the mouse while its popup is open. Because of that,
@@ -1982,6 +1991,25 @@ public partial class PlayerWindow : Window
         // would reach that same ComboBox and reopen it. Consume this dismissal click explicitly.
         CloseSelectorPopupsExcept(null);
         e.Handled = true;
+    }
+
+    private void ReleaseStaleMouseCapture()
+    {
+        if (Mouse.Captured is not FrameworkElement captured) return;
+        if (!GetCursorPos(out var cursor)) return;
+
+        try
+        {
+            // A live drag keeps the captured thumb under/near the cursor. A capture whose owner
+            // is far away is stale — typically the mouse-up got swallowed by the LibVLC child
+            // HWND mid-drag — and silently eats every subsequent click in the window.
+            var local = captured.PointFromScreen(new System.Windows.Point(cursor.X, cursor.Y));
+            var bounds = new Rect(-80, -80, captured.ActualWidth + 160, captured.ActualHeight + 160);
+            if (bounds.Contains(local)) return;
+        }
+        catch { }
+
+        Mouse.Capture(null);
     }
 
     private ComboBox? GetSelectorAtScreenPoint(NativePoint point)

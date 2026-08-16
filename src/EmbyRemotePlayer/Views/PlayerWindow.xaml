@@ -347,7 +347,7 @@
             <Setter Property="MinHeight" Value="50"/>
             <Setter Property="FontSize" Value="15"/>
             <Setter Property="FontFamily" Value="Microsoft YaHei UI"/>
-            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontWeight" Value="Normal"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="SnapsToDevicePixels" Value="True"/>
             <Setter Property="UseLayoutRounding" Value="True"/>
@@ -366,7 +366,7 @@
                                                   TextElement.Foreground="#FFFFFFFF"
                                                   TextElement.FontFamily="Microsoft YaHei UI"
                                                   TextElement.FontSize="15"
-                                                  TextElement.FontWeight="Bold"
+                                                  TextElement.FontWeight="Normal"
                                                   TextOptions.TextFormattingMode="Display"
                                                   TextOptions.TextRenderingMode="ClearType"
                                                   TextOptions.TextHintingMode="Fixed"/>
@@ -601,7 +601,7 @@
                             </Ellipse.Triggers>
                         </Ellipse>
                     </Grid>
-                    <TextBlock x:Name="LoadingText" Text="正在准备播放…" Foreground="White" FontSize="14" FontWeight="SemiBold"
+                    <TextBlock x:Name="LoadingText" Text="正在准备播放…" Foreground="White" FontSize="14" FontWeight="Normal"
                                HorizontalAlignment="Center" Margin="0,16,0,0" Effect="{StaticResource TextShadow}"/>
                     <TextBlock x:Name="LoadingDetailText" Text="连接媒体服务器" Foreground="#AFFFFFFF" FontSize="11"
                                HorizontalAlignment="Center" Margin="0,5,0,0" TextAlignment="Center"/>
@@ -683,7 +683,7 @@
                                     Click="CloseEpisodePanelButton_Click"/>
                         </StackPanel>
                     </Grid>
-                    <TextBlock x:Name="EpisodePanelTitleText" Grid.Row="1" Foreground="#F7FFFFFF" FontFamily="Microsoft YaHei UI" FontSize="14" FontWeight="Bold" Margin="0,4,4,12" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType" TextOptions.TextHintingMode="Fixed"/>
+                    <TextBlock x:Name="EpisodePanelTitleText" Grid.Row="1" Foreground="#F7FFFFFF" FontFamily="Microsoft YaHei UI" FontSize="14" FontWeight="Normal" Margin="0,4,4,12" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType" TextOptions.TextHintingMode="Fixed"/>
                     <ScrollViewer x:Name="EpisodeScrollViewer" Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                         <ItemsControl x:Name="EpisodeItemsControl">
                             <ItemsControl.ItemTemplate>
@@ -693,7 +693,7 @@
                                             <Grid.ColumnDefinitions><ColumnDefinition Width="54"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                             <TextBlock Text="{Binding Number}" Foreground="#F3FFFFFF" FontFamily="Microsoft YaHei UI" FontSize="13" FontWeight="Bold" VerticalAlignment="Center" HorizontalAlignment="Center" SnapsToDevicePixels="True" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType" TextOptions.TextHintingMode="Fixed"/>
                                             <StackPanel Grid.Column="1" Margin="8,0,12,0">
-                                                <TextBlock Text="{Binding Title}" Foreground="#FFFFFFFF" FontFamily="Microsoft YaHei UI" FontSize="15" FontWeight="Bold" TextTrimming="CharacterEllipsis" SnapsToDevicePixels="True" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType" TextOptions.TextHintingMode="Fixed"/>
+                                                <TextBlock Text="{Binding Title}" Foreground="#FFFFFFFF" FontFamily="Microsoft YaHei UI" FontSize="15" FontWeight="Normal" TextTrimming="CharacterEllipsis" SnapsToDevicePixels="True" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType" TextOptions.TextHintingMode="Fixed"/>
                                                 <TextBlock Text="{Binding Meta}" Foreground="#D8FFFFFF" FontFamily="Microsoft YaHei UI" FontSize="12" FontWeight="Normal" Margin="0,3,0,0" TextTrimming="CharacterEllipsis" SnapsToDevicePixels="True" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType" TextOptions.TextHintingMode="Fixed"/>
                                                 <ProgressBar Height="2" Margin="0,7,8,0" Minimum="0" Maximum="100" Value="{Binding Progress, Mode=OneWay}"
                                                              BorderThickness="0" Background="#28FFFFFF" Foreground="#FFE50914"/>

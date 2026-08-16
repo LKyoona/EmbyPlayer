@@ -1,3 +1,9 @@
+## 0.8.3.4
+- Fixed player buttons that "sometimes did not respond":
+  - The 3-second auto-hide no longer fades the control bar out from under a stationary cursor resting on it (left controls, slider, title bar, episode panel). Previously that click fell through to the video and toggled playback instead of hitting the button.
+  - Stale WPF mouse captures are now released on the next click: when a seek/volume drag ended with the mouse-up swallowed by the LibVLC video HWND, the leaked capture silently ate every subsequent click in the window.
+- Player typography: small-size Chinese text dropped the Bold weight (selector popup menu items, episode panel title/entries, loading text) — bold YaHei at 13–15px rendered thick and fuzzy. Large titles keep Bold.
+
 ## 0.8.3.3
 - Dedupe is now year-compatible: entries whose ProductionYear is missing fall back to the year parsed from the filename ("xx (2019) {tmdb-…}"), and a missing year on one side still merges with an explicit year on the other. Plain Folder items join the video group but require a strict equal-year match so real structural folders never collapse onto movies.
 - Collapsed-entry counts are written to the app log for diagnosis.

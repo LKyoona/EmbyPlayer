@@ -178,10 +178,24 @@ public sealed class PlayerViewModel : NotifyObject, IDisposable
             _autoHideTimer.Start();
     }
 
+    /// <summary>
+    /// Optional UI-supplied check: return true when the pointer is currently resting on
+    /// interactive chrome. The auto-hide timer consults it so a stationary cursor parked on
+    /// a control never has the bar fade out from underneath (which turned the next click
+    /// into a fall-through video toggle).
+    /// </summary>
+    public Func<bool>? KeepVisibleCheck { get; set; }
+
     private void AutoHideTimer_Tick(object? sender, EventArgs e)
     {
         _autoHideTimer.Stop();
         if (_interactionDepth > 0) return;
+        if (KeepVisibleCheck?.Invoke() == true)
+        {
+            IsControlsVisible = true;
+            _autoHideTimer.Start();
+            return;
+        }
         IsControlsVisible = false;
     }
 
