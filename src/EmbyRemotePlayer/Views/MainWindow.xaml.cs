@@ -629,44 +629,81 @@ public partial class MainWindow : Window
         item.Type is "Episode" or "Video" or "MusicVideo" or "Trailer";
 
     private static readonly System.Text.RegularExpressions.Regex TrailingYearPattern =
-        new(@"\s*\(\d{4}\)\s*$", System.Text.RegularExpressions.RegexOptions.Compiled);
+        new(@"\s*[\(（](?<year>\d{4})[\)）]\s*$", System.Text.RegularExpressions.RegexOptions.Compiled);
 
     private static IReadOnlyList<EmbyItem> DeduplicateBrowseItems(IReadOnlyList<EmbyItem> items)
     {
         if (items.Count < 2) return items;
 
         var result = new List<EmbyItem>(items.Count);
-        var indexByKey = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        // name-key → candidates. Plain folders join the movie group but require a strict
+        // year match so a real "Season 1"-style folder can never collapse onto a movie.
+        var buckets = new Dictionary<string, List<(int Index, int Year, bool Strict)>>(StringComparer.OrdinalIgnoreCase);
+
         foreach (var item in items)
         {
-            var key = BuildDedupeKey(item);
-            if (key is not null && indexByKey.TryGetValue(key, out var index))
+            var nameKey = BuildDedupeNameKey(item);
+            var year = ResolveItemYear(item);
+            var strict = IsPlainFolderItem(item);
+
+            if (nameKey is not null && buckets.TryGetValue(nameKey, out var candidates))
             {
-                // Keep one entry per title — preferring the one that carries artwork.
-                var existing = result[index];
-                if (string.IsNullOrWhiteSpace(existing.OwnPrimaryImageTag) &&
-                    !string.IsNullOrWhiteSpace(item.OwnPrimaryImageTag))
+                var merged = false;
+                for (var i = 0; i < candidates.Count; i++)
                 {
-                    result[index] = item;
+                    var (index, existingYear, existingStrict) = candidates[i];
+                    var compatible = existingYear == year
+                                     || (!strict && !existingStrict && (existingYear == 0 || year == 0));
+                    if (!compatible) continue;
+
+                    // Keep one entry per title — preferring the one that carries artwork.
+                    var existing = result[index];
+                    if (string.IsNullOrWhiteSpace(existing.OwnPrimaryImageTag) &&
+                        !string.IsNullOrWhiteSpace(item.OwnPrimaryImageTag))
+                    {
+                        result[index] = item;
+                        candidates[i] = (index, year == 0 ? existingYear : year, existingStrict || strict);
+                    }
+                    merged = true;
+                    break;
                 }
-                continue;
+                if (merged) continue;
             }
-            if (key is not null) indexByKey[key] = result.Count;
+
+            if (nameKey is not null)
+            {
+                (buckets.TryGetValue(nameKey, out var list) ? list : buckets[nameKey] = []).Add((result.Count, year, strict));
+            }
             result.Add(item);
         }
+
+        var collapsed = items.Count - result.Count;
+        if (collapsed > 0)
+            LogService.Info($"Collapsed {collapsed} duplicate entr{(collapsed == 1 ? "y" : "ies")} while rendering a browse list.");
         return result;
     }
 
-    private static string? BuildDedupeKey(EmbyItem item)
+    private static bool IsPlainFolderItem(EmbyItem item) =>
+        item.Type is "Folder" or "VideoFolder";
+
+    private static int ResolveItemYear(EmbyItem item)
+    {
+        if (item.ProductionYear is int year) return year;
+        // Raw-filename entries often carry the year only inside the name, e.g. "xx (2019) {tmdb-…}".
+        var match = TrailingYearPattern.Match(ItemNameCleaner.Clean(item.Name ?? string.Empty));
+        return match.Success && int.TryParse(match.Groups["year"].Value, out var parsed) ? parsed : 0;
+    }
+
+    private static string? BuildDedupeNameKey(EmbyItem item)
     {
         if (string.IsNullOrWhiteSpace(item.Name)) return null;
         var name = TrailingYearPattern.Replace(ItemNameCleaner.Clean(item.Name!), string.Empty).Trim();
         if (name.Length == 0) return null;
 
-        // Unscraped movies come back as Type "Video" while their properly scraped twin is a
-        // "Movie" — normalize both into one video group or the duplicate check never fires.
-        var typeGroup = item.Type is "Movie" or "Video" or "MusicVideo" ? "V" : item.Type;
-        return $"{typeGroup}|{item.ProductionYear ?? 0}|{item.SeriesId}|{item.ParentIndexNumber ?? 0}|{item.IndexNumber ?? 0}|{name}";
+        // Unscraped movies come back as Type "Video" (or plain "Folder") while their
+        // properly scraped twin is a "Movie" — normalize all into one video group.
+        var typeGroup = item.Type is "Movie" or "Video" or "MusicVideo" or "Folder" or "VideoFolder" ? "V" : item.Type;
+        return $"{typeGroup}|{item.SeriesId}|{item.ParentIndexNumber ?? 0}|{item.IndexNumber ?? 0}|{name}";
     }
 
     private bool IsSearchBrowseActive =>

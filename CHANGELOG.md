@@ -1,3 +1,7 @@
+## 0.8.3.3
+- Dedupe is now year-compatible: entries whose ProductionYear is missing fall back to the year parsed from the filename ("xx (2019) {tmdb-…}"), and a missing year on one side still merges with an explicit year on the other. Plain Folder items join the video group but require a strict equal-year match so real structural folders never collapse onto movies.
+- Collapsed-entry counts are written to the app log for diagnosis.
+
 ## 0.8.3.2
 - Single-file movie folders now open the detail page directly — no more one-card intermediate list that needs a second click; 返回 still returns to the previous list.
 - Duplicate detection normalizes Movie/Video types: an unscraped "Video" twin of a scraped "Movie" (same cleaned title + year) is now collapsed — previously the type mismatch defeated the check.
