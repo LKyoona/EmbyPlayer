@@ -41,12 +41,14 @@ public partial class MainWindow : Window
     private List<MediaCardViewModel> _browseCards = [];
     private readonly ObservableCollection<MediaCardViewModel> _browseVisibleCards = [];
     private List<SearchCardSection> _searchSections = [];
+    private bool _browseFlatLandscape;
 
     private const int BrowseInitialRenderCount = 36;
     private const int BrowseRenderBatchSize = 24;
     private const double PosterCellWidth = 182;
     private const double PosterCellHeight = 284;
     private const double LandscapeCellWidth = 322;
+    private const double LandscapeCellHeight = 195;
 
     private readonly Dictionary<ScrollViewer, SmoothScrollState> _smoothScrollStates = new();
     private readonly DispatcherTimer _smoothScrollTimer;
@@ -573,7 +575,21 @@ public partial class MainWindow : Window
         _browseCards = CreateCards(items);
         _browseVisibleCards.Clear();
 
-        if (state.Kind == BrowseKind.Search)
+        // Content-driven layout: episodes/videos carry 16:9 stills and belong in landscape
+        // cards; movies/series carry 2:3 posters. Mixed lists split into typed sections so
+        // no tile ever hosts a mismatched aspect ratio. Library roots always use wide tiles.
+        var landscapeCount = 0;
+        foreach (var card in _browseCards)
+        {
+            if (IsLandscapeCardItem(card.Item)) landscapeCount++;
+        }
+
+        var useSections = state.Kind == BrowseKind.Search
+                          || (landscapeCount > 0 && landscapeCount < _browseCards.Count);
+        _browseFlatLandscape = !useSections
+                               && (state.Kind == BrowseKind.LibraryRoot || landscapeCount == _browseCards.Count);
+
+        if (useSections)
         {
             // Grouped sections are derived purely from the item list, so the existing
             // BrowseSnapshot(State, Items, Offset) back stack restores them for free.
@@ -587,6 +603,7 @@ public partial class MainWindow : Window
             BrowseItemsControl.Visibility = Visibility.Visible;
             SearchSectionsStack.Visibility = Visibility.Collapsed;
             ClearSearchSections();
+            BrowseItemsControl.ItemTemplate = (DataTemplate)FindResource(_browseFlatLandscape ? "LandscapeCardTemplate" : "PosterCardTemplate");
             AppendBrowseCards(BrowseInitialRenderCount);
             BrowseItemsControl.ItemsSource = _browseVisibleCards;
         }
@@ -594,16 +611,19 @@ public partial class MainWindow : Window
         return Task.CompletedTask;
     }
 
-    private bool IsSearchBrowseActive =>
-        _currentNavigation?.Kind == BrowseKind.Search && SearchSectionsStack.Visibility == Visibility.Visible;
+    private static bool IsLandscapeCardItem(EmbyItem item) =>
+        item.Type is "Episode" or "Video" or "MusicVideo" or "Trailer";
 
-    private static readonly (string Title, string[] Types)[] SearchSectionOrder =
+    private bool IsSearchBrowseActive =>
+        SearchSectionsStack.Visibility == Visibility.Visible && _searchSections.Count > 0;
+
+    private static readonly (string Title, string[] Types, bool Landscape)[] SearchSectionOrder =
     {
-        ("电影", new[] { "Movie" }),
-        ("剧集", new[] { "Series", "Season" }),
-        ("单集", new[] { "Episode", "Video" }),
-        ("合集", new[] { "BoxSet" }),
-        ("人物", new[] { "Person" }),
+        ("电影", new[] { "Movie" }, false),
+        ("剧集", new[] { "Series", "Season" }, false),
+        ("单集", new[] { "Episode", "Video" }, true),
+        ("合集", new[] { "BoxSet" }, false),
+        ("人物", new[] { "Person" }, false),
     };
 
     private void BuildSearchSections(IReadOnlyList<MediaCardViewModel> cards)
@@ -612,7 +632,7 @@ public partial class MainWindow : Window
         _searchSections.Clear();
 
         var assigned = new bool[cards.Count];
-        foreach (var (title, types) in SearchSectionOrder)
+        foreach (var (title, types, landscape) in SearchSectionOrder)
         {
             var sectionCards = new List<MediaCardViewModel>();
             for (var i = 0; i < cards.Count; i++)
@@ -625,7 +645,7 @@ public partial class MainWindow : Window
                 }
             }
             if (sectionCards.Count > 0)
-                _searchSections.Add(CreateSearchSection(title, sectionCards));
+                _searchSections.Add(CreateSearchSection(title, sectionCards, landscape));
         }
 
         var rest = new List<MediaCardViewModel>();
@@ -634,12 +654,12 @@ public partial class MainWindow : Window
             if (!assigned[i]) rest.Add(cards[i]);
         }
         if (rest.Count > 0)
-            _searchSections.Add(CreateSearchSection("其他", rest));
+            _searchSections.Add(CreateSearchSection("其他", rest, landscape: false));
     }
 
-    private SearchCardSection CreateSearchSection(string title, List<MediaCardViewModel> sectionCards)
+    private SearchCardSection CreateSearchSection(string title, List<MediaCardViewModel> sectionCards, bool landscape)
     {
-        var section = new SearchCardSection(title, sectionCards);
+        var section = new SearchCardSection(title, sectionCards, landscape);
         SearchSectionsStack.Children.Add(new TextBlock
         {
             Text = $"{title}（{sectionCards.Count}）",
@@ -650,7 +670,7 @@ public partial class MainWindow : Window
 
         var control = new ItemsControl
         {
-            ItemTemplate = (DataTemplate)FindResource("PosterCardTemplate"),
+            ItemTemplate = (DataTemplate)FindResource(landscape ? "LandscapeCardTemplate" : "PosterCardTemplate"),
             ItemsPanel = new ItemsPanelTemplate(new FrameworkElementFactory(typeof(WrapPanel))),
             ItemsSource = section.VisibleCards,
             Margin = new Thickness(0, 0, 0, 24)
@@ -850,8 +870,9 @@ public partial class MainWindow : Window
         if (BrowseScroll.Visibility != Visibility.Visible) return;
         if (BrowseScroll.ExtentHeight <= 0 || BrowseScroll.ViewportHeight <= 0) return;
 
+        var cellHeight = _browseFlatLandscape ? LandscapeCellHeight : PosterCellHeight;
         var remaining = BrowseScroll.ExtentHeight - (BrowseScroll.VerticalOffset + BrowseScroll.ViewportHeight);
-        if (remaining > PosterCellHeight * 2.5) return;
+        if (remaining > cellHeight * 2.5) return;
 
         if (IsSearchBrowseActive)
         {
@@ -874,19 +895,21 @@ public partial class MainWindow : Window
         }
 
         var width = BrowseScroll.ViewportWidth > 1 ? BrowseScroll.ViewportWidth : Math.Max(700, ActualWidth - 310);
-        var columns = Math.Max(1, (int)Math.Floor(width / PosterCellWidth));
-        var firstVisibleRow = Math.Max(0, (int)Math.Floor(BrowseScroll.VerticalOffset / PosterCellHeight) - 1);
-        var visibleRows = Math.Max(2, (int)Math.Ceiling(Math.Max(400, BrowseScroll.ViewportHeight) / PosterCellHeight) + 2);
+        var cellWidth = _browseFlatLandscape ? LandscapeCellWidth : PosterCellWidth;
+        var cellHeight = _browseFlatLandscape ? LandscapeCellHeight : PosterCellHeight;
+        var columns = Math.Max(1, (int)Math.Floor(width / cellWidth));
+        var firstVisibleRow = Math.Max(0, (int)Math.Floor(BrowseScroll.VerticalOffset / cellHeight) - 1);
+        var visibleRows = Math.Max(2, (int)Math.Ceiling(Math.Max(400, BrowseScroll.ViewportHeight) / cellHeight) + 2);
         var availableCount = _browseVisibleCards.Count;
         var start = Math.Min(availableCount, firstVisibleRow * columns);
         var visibleCount = Math.Min(availableCount - start, visibleRows * columns);
 
-        ScheduleCardRange(_browseCards, preferBackdrop: false, start, visibleCount, ImageRequestPriority.Visible);
+        ScheduleCardRange(_browseCards, preferBackdrop: _browseFlatLandscape, start, visibleCount, ImageRequestPriority.Visible);
 
         var prefetchStart = start + visibleCount;
         var prefetchCount = Math.Min(columns * 2, availableCount - prefetchStart);
         if (prefetchCount > 0)
-            ScheduleCardRange(_browseCards, preferBackdrop: false, prefetchStart, prefetchCount, ImageRequestPriority.Prefetch);
+            ScheduleCardRange(_browseCards, preferBackdrop: _browseFlatLandscape, prefetchStart, prefetchCount, ImageRequestPriority.Prefetch);
     }
 
     private void ScheduleSearchViewport()
@@ -895,12 +918,14 @@ public partial class MainWindow : Window
         var viewportTop = BrowseScroll.VerticalOffset;
         var viewportBottom = viewportTop + BrowseScroll.ViewportHeight;
         var width = BrowseScroll.ViewportWidth > 1 ? BrowseScroll.ViewportWidth : Math.Max(700, ActualWidth - 310);
-        var columns = Math.Max(1, (int)Math.Floor(width / PosterCellWidth));
 
         foreach (var section in _searchSections)
         {
             var availableCount = section.VisibleCards.Count;
             if (availableCount == 0) continue;
+            var cellWidth = section.Landscape ? LandscapeCellWidth : PosterCellWidth;
+            var cellHeight = section.Landscape ? LandscapeCellHeight : PosterCellHeight;
+            var columns = Math.Max(1, (int)Math.Floor(width / cellWidth));
 
             // Only sections whose WrapPanel is near the vertical viewport enqueue images.
             double sectionTop, sectionHeight;
@@ -918,15 +943,15 @@ public partial class MainWindow : Window
             const double margin = 520;
             if (sectionTop > viewportBottom + margin || sectionTop + sectionHeight < viewportTop - margin) continue;
 
-            var firstRow = Math.Max(0, (int)Math.Floor((viewportTop - sectionTop) / PosterCellHeight) - 1);
+            var firstRow = Math.Max(0, (int)Math.Floor((viewportTop - sectionTop) / cellHeight) - 1);
             var renderedRows = (int)Math.Ceiling((double)availableCount / columns) - 1;
-            var lastRow = Math.Min(renderedRows, (int)Math.Floor((viewportBottom - sectionTop) / PosterCellHeight) + 1);
+            var lastRow = Math.Min(renderedRows, (int)Math.Floor((viewportBottom - sectionTop) / cellHeight) + 1);
             if (lastRow < firstRow) continue;
 
             var start = firstRow * columns;
             var count = Math.Min(availableCount - start, (lastRow - firstRow + 1) * columns);
             if (count > 0)
-                ScheduleCardRange(section.VisibleCards, preferBackdrop: false, start, count, ImageRequestPriority.Visible);
+                ScheduleCardRange(section.VisibleCards, preferBackdrop: section.Landscape, start, count, ImageRequestPriority.Visible);
         }
     }
 
@@ -2112,6 +2137,7 @@ public partial class MainWindow : Window
         _latestEpisodeCards = [];
         _browseCards = [];
         _browseVisibleCards.Clear();
+        _browseFlatLandscape = false;
         ClearSearchSections();
         _detailEpisodeCards = [];
         _detailSimilarCards = [];
@@ -2165,10 +2191,11 @@ public partial class MainWindow : Window
 
     private sealed record BrowseSnapshot(NavigationState State, IReadOnlyList<EmbyItem> Items, double VerticalOffset);
 
-    private sealed class SearchCardSection(string title, List<MediaCardViewModel> cards)
+    private sealed class SearchCardSection(string title, List<MediaCardViewModel> cards, bool landscape)
     {
         public string Title { get; } = title;
         public List<MediaCardViewModel> Cards { get; } = cards;
+        public bool Landscape { get; } = landscape;
         public ObservableCollection<MediaCardViewModel> VisibleCards { get; } = [];
         public ItemsControl ItemsControl { get; set; } = null!;
     }

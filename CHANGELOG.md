@@ -1,3 +1,10 @@
+## 0.8.3.0
+- Content-driven card layout — no tile ever hosts a mismatched aspect ratio anymore:
+  - Pure episode/video lists (season pages, episode-heavy libraries) now render as a 16:9 landscape card grid instead of squeezing stills into 2:3 poster tiles.
+  - Mixed lists (favorites, heterogeneous libraries) auto-split into typed sections: 电影/剧集/合集 poster sections plus a landscape 单集 section, reusing the search grouping machinery.
+  - The media library root now shows wide landscape tiles with title overlays instead of poster crops.
+  - Search results' 单集 section uses landscape cards to match its stills.
+
 ## 0.8.2.25
 - Mismatched-aspect card artwork now renders over a blurred self-fill: the complete sharp image (Uniform) sits on a dimmed blurred copy of itself that fills the tile, replacing the plain dark letterbox bars. Cards whose aspect already matches the tile keep zero-effect rendering.
 
