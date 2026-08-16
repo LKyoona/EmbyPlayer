@@ -281,7 +281,25 @@ public sealed class EmbyApiClient : IDisposable
         {
             ["SearchTerm"] = term.Trim(),
             ["Recursive"] = "true",
-            ["IncludeItemTypes"] = "Movie,Series,Season,Episode,Video,BoxSet",
+            ["IncludeItemTypes"] = "Movie,Series,Season,Episode,Video,BoxSet,Person",
+            ["SortBy"] = "SortName",
+            ["SortOrder"] = "Ascending",
+            ["Limit"] = "150",
+            ["Fields"] = ListFields,
+            ["EnableImages"] = "true",
+            ["ImageTypeLimit"] = "1"
+        });
+        return (await GetCachedJsonAsync<ItemsResult>(endpoint, CachePolicy.Search, cancellationToken).ConfigureAwait(false)).Items;
+    }
+
+    public async Task<List<EmbyItem>> GetPersonItemsAsync(string personId, CancellationToken cancellationToken = default)
+    {
+        EnsureAuthenticated();
+        var endpoint = AddQuery($"Users/{EscapePath(UserId!)}/Items", new Dictionary<string, string?>
+        {
+            ["PersonIds"] = personId,
+            ["Recursive"] = "true",
+            ["IncludeItemTypes"] = "Movie,Series,Episode,Video",
             ["SortBy"] = "SortName",
             ["SortOrder"] = "Ascending",
             ["Limit"] = "150",
@@ -412,7 +430,10 @@ public sealed class EmbyApiClient : IDisposable
         using var request = CreateRequest(HttpMethod.Get, endpoint, true);
         request.Headers.Accept.Clear();
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("image/*"));
-        using var response = await SendAsync(request, true, cancellationToken).ConfigureAwait(false);
+        // Images are non-critical decoration: never retry them. Retrying amplified every 5xx
+        // on flaky shared servers into three requests, and the card pipeline already has
+        // fallback artwork plus negative caching to degrade gracefully.
+        using var response = await SendAsync(request, false, cancellationToken).ConfigureAwait(false);
         await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
         return await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
     }

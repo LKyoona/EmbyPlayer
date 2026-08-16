@@ -14,6 +14,12 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+      - name: Resolve version
+        id: ver
+        shell: pwsh
+        run: |
+          $csproj = Get-Content src/EmbyRemotePlayer/EmbyRemotePlayer.csproj -Raw
+          if ($csproj -match '<Version>\s*([^<]+?)\s*</Version>') { "version=$($Matches[1])" >> $env:GITHUB_OUTPUT } else { "version=0.0.0" >> $env:GITHUB_OUTPUT }
       - name: Restore
         run: dotnet restore src/EmbyRemotePlayer/EmbyRemotePlayer.csproj -r win-x64
       - name: Build
@@ -22,5 +28,5 @@ jobs:
         run: dotnet publish src/EmbyRemotePlayer/EmbyRemotePlayer.csproj -c Release -r win-x64 --self-contained true --no-restore -p:PublishSingleFile=false -p:PublishReadyToRun=false -o publish/win-x64
       - uses: actions/upload-artifact@v4
         with:
-          name: EmbyRemotePlayer-v0.2.1-win-x64
+          name: EmbyRemotePlayer-v${{ steps.ver.outputs.version }}-win-x64
           path: publish/win-x64

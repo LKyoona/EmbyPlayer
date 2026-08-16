@@ -1,8 +1,10 @@
 .vs/
 .idea/
+.zcode/
 **/bin/
 **/obj/
 publish/
+dist/
 *.user
 *.suo
 *.log

@@ -1,3 +1,34 @@
+## 0.8.2.23
+- Resilience against flaky (often shared) Emby servers that answer image requests with 500/404:
+  - Image downloads are no longer retried — a failing image previously fired three requests each (attempt + 2 retries), tripling load and error counts.
+  - Metadata refresh failures now fall back to the last cached snapshot, however old, so a server hiccup never blanks a page that was shown before; only endpoints with no history at all surface an error.
+  - Main-page errors switched from a blocking modal MessageBox to a non-blocking toast that auto-dismisses after 4.5 seconds (click to close).
+
+## 0.8.2.22
+- Cards now show a lightweight rotating spinner while their image is loading over the network; the neutral "no artwork" glyph only appears after the load definitively fails.
+- Documented the existing Shift + mouse-wheel horizontal scrolling for card rows (home shelves, detail shelves) in the README shortcut list; plain wheel keeps scrolling the page vertically.
+
+## 0.8.2.21
+- Fixed the "blank poster tile" root cause: episode cards requested the episode's own Primary still, but the server answered 404 ("does not have an image of type Primary") or even 500 for episodes without stills — while the detail page showed the series backdrop, which is a different image. Episode cards now fall back to series/season artwork, matching official clients.
+- Failed image lookups are now negatively cached in memory (404 for 10 minutes, other failures for 90 seconds). Previously every scroll re-requested the same hundreds of missing images (282 duplicate failures observed in one session's log).
+- Confirmed the "Object reference not set" text in image error logs is the Emby server's own 500 response body, not a client exception.
+
+## 0.8.2.20
+- Netflix-inspired visual restyle: near-black `#141414` page, red `#E50914` brand accent, quiet dark panels; login/server/detail pages follow the shared theme automatically.
+- Cards are borderless Netflix tiles (6px radius) with a smooth 150ms hover scale-up and a shadow that only exists while hovered; watched-progress bars are Netflix red.
+- Sidebar restyled to a dark rail with a red brand badge; headers, search field and busy overlay match the new palette. The green Emby logo tile placeholder is replaced by a neutral "no artwork" glyph.
+- Poster loading gains an explicit fallback chain Primary → Thumb → Backdrop, so unscraped library items without a Primary image no longer render blank tiles.
+- Dev tooling: new `dev.ps1 watch` live-reload mode (dotnet watch, auto restart on rude edits) and a new developer workflow guide `docs/开发工作流.md`; verify now auto-repacks stale publish output.
+
+## 0.8.2.19
+- Search results are grouped by type (电影 / 剧集 / 单集 / 合集 / 人物 / 其他) with per-section counts instead of one flat poster grid.
+- Search now includes Person results; clicking a person opens their works as a browse list (back button returns to the search results).
+- Searching no longer clears the browse back stack: 返回 restores the previous browse context and scroll offset.
+- Ctrl+F / Ctrl+K focuses the search box from anywhere — including the detail page, which is closed first — and selects the existing text.
+- Empty search results now show「没有找到相关内容」.
+- Grouped sections reuse the poster card template, progressive rendering and viewport-driven image scheduling (per-section visibility), so a 150-result page stays as cheap as the flat grid.
+- New one-stop dev tool `dev.ps1` / `dev.cmd`: build / run / pack (self-contained + dist zip) / verify (integrity, version match, LibVLC natives, 8s smoke launch) / clean. CI artifact name now follows the csproj version instead of the hardcoded v0.2.1.
+
 ## 0.8.2.17
 - Fix regression where Audio / Subtitle / Speed / Media Source selector popups immediately closed and appeared unable to open.
 - Restore native WPF ComboBox mouse capture; do not call Mouse.Capture(null) after DropDownOpened.

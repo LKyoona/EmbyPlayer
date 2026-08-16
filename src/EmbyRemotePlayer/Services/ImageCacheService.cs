@@ -75,6 +75,36 @@ public sealed class ImageCacheService : IDisposable
         GetAsync(item.EffectivePrimaryImageItemId, "Primary", item.EffectivePrimaryImageTag, maxWidth, cancellationToken, priority);
 
     /// <summary>
+    /// Poster lookup for grid cards with an explicit fallback chain. Episodes try their own
+    /// still first; when the server has none (404/500 on /Images/Primary), fall through to
+    /// the series/season artwork instead of rendering a blank tile — matching official clients.
+    /// Non-episodes fall back Primary → Thumb → Backdrop for unscraped items.
+    /// </summary>
+    public async Task<BitmapSource?> GetCardPosterAsync(
+        EmbyItem item,
+        int maxWidth,
+        CancellationToken cancellationToken = default,
+        ImageRequestPriority priority = ImageRequestPriority.Visible)
+    {
+        if (string.Equals(item.Type, "Episode", StringComparison.OrdinalIgnoreCase))
+        {
+            var still = await GetEpisodePrimaryAsync(item, maxWidth, cancellationToken, priority).ConfigureAwait(false);
+            if (still is not null) return still;
+        }
+
+        var primary = await GetPrimaryAsync(item, maxWidth, cancellationToken, priority).ConfigureAwait(false);
+        if (primary is not null) return primary;
+
+        if (item.ImageTags is not null && item.ImageTags.TryGetValue("Thumb", out var thumbTag) && !string.IsNullOrWhiteSpace(thumbTag))
+        {
+            var thumb = await GetAsync(item.Id, "Thumb", thumbTag, maxWidth, cancellationToken, priority).ConfigureAwait(false);
+            if (thumb is not null) return thumb;
+        }
+
+        return await GetBackdropAsync(item, maxWidth, cancellationToken, priority).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Episode cards must use the episode's own still image. Do not silently collapse
     /// multiple episodes onto the series poster/backdrop, because every episode can
     /// have a distinct Primary image in Emby. If this episode truly has no Primary
@@ -233,6 +263,14 @@ public sealed class ImageCacheService : IDisposable
                 catch (Exception ex)
                 {
                     LogService.Warning($"Unable to load {request.ImageType} image for item {request.ItemId}.", ex);
+
+                    // A definitive "no image" answer or a server-side failure must not be re-requested
+                    // on every viewport pass — one grid scroll used to fire hundreds of duplicate 404/500s.
+                    // Short-lived negative caching keeps scrolling cheap while a later retry can still win.
+                    var negativeTtl = ex is EmbyApiException { StatusCode: HttpStatusCode.NotFound }
+                        ? TimeSpan.FromMinutes(10)
+                        : TimeSpan.FromSeconds(90);
+                    PutMemory(request.Key, null, DateTimeOffset.UtcNow + negativeTtl);
                     request.Completion.TrySetResult(null);
                 }
                 finally
@@ -312,6 +350,16 @@ public sealed class ImageCacheService : IDisposable
                 return false;
             }
 
+            if (entry.Bitmap is null && entry.ExpiresAt <= DateTimeOffset.UtcNow)
+            {
+                // Expired negative entry: forget it so a retry can hit the server again
+                // (e.g. artwork was re-scraped or a transient failure recovered).
+                _lru.Remove(entry.Node);
+                _memory.Remove(key);
+                bitmap = null;
+                return false;
+            }
+
             _lru.Remove(entry.Node);
             _lru.AddFirst(entry.Node);
             bitmap = entry.Bitmap;
@@ -319,9 +367,9 @@ public sealed class ImageCacheService : IDisposable
         }
     }
 
-    private void PutMemory(string key, BitmapSource bitmap)
+    private void PutMemory(string key, BitmapSource? bitmap, DateTimeOffset expiresAt = default)
     {
-        var bytes = EstimateDecodedBytes(bitmap);
+        var bytes = bitmap is null ? 0 : EstimateDecodedBytes(bitmap);
         lock (_memoryGate)
         {
             if (_memory.TryGetValue(key, out var old))
@@ -331,7 +379,7 @@ public sealed class ImageCacheService : IDisposable
             }
 
             var node = _lru.AddFirst(key);
-            _memory[key] = new MemoryEntry(bitmap, bytes, node);
+            _memory[key] = new MemoryEntry(bitmap, bytes, node, expiresAt == default ? DateTimeOffset.MaxValue : expiresAt);
             _memoryBytes += bytes;
 
             while (_memoryBytes > MaxMemoryBytes && _lru.Last is { } tail)
@@ -470,7 +518,7 @@ public sealed class ImageCacheService : IDisposable
         _prefetchQueue.Writer.TryComplete();
     }
 
-    private sealed record MemoryEntry(BitmapSource Bitmap, long EstimatedBytes, LinkedListNode<string> Node);
+    private sealed record MemoryEntry(BitmapSource? Bitmap, long EstimatedBytes, LinkedListNode<string> Node, DateTimeOffset ExpiresAt);
 
     private sealed class ImageRequestEntry : IDisposable
     {

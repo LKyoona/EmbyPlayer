@@ -40,6 +40,7 @@ public partial class MainWindow : Window
     private List<MediaCardViewModel> _latestEpisodeCards = [];
     private List<MediaCardViewModel> _browseCards = [];
     private readonly ObservableCollection<MediaCardViewModel> _browseVisibleCards = [];
+    private List<SearchCardSection> _searchSections = [];
 
     private const int BrowseInitialRenderCount = 36;
     private const int BrowseRenderBatchSize = 24;
@@ -472,7 +473,9 @@ public partial class MainWindow : Window
         try
         {
             var items = await _api.SearchAsync(term, token);
-            _navigation.Clear();
+            // Searching is a navigation step now, not a stack reset: the previous browse
+            // context survives so 返回 restores it with its scroll offset.
+            PushCurrentBrowseSnapshot();
             await ShowBrowseAsync(new NavigationState(BrowseKind.Search, $"搜索：{term}", SearchTerm: term), items, false, token);
         }
         catch (OperationCanceledException) { }
@@ -502,7 +505,42 @@ public partial class MainWindow : Window
             await BrowseIntoAsync(card.Item);
             return;
         }
+        if (IsPersonItem(card.Item))
+        {
+            await BrowsePersonAsync(card.Item);
+            return;
+        }
         if (card.Item.CanPlay) await ShowDetailsAsync(card.Item);
+    }
+
+    private static bool IsPersonItem(EmbyItem item) =>
+        string.Equals(item.Type, "Person", StringComparison.OrdinalIgnoreCase);
+
+    private async Task BrowsePersonAsync(EmbyItem person)
+    {
+        if (_api is null) return;
+        var token = BeginOperation();
+        ShowBusy($"正在加载 {person.Name} 的作品…");
+        try
+        {
+            var items = await _api.GetPersonItemsAsync(person.Id, token);
+            PushCurrentBrowseSnapshot();
+            await ShowBrowseAsync(new NavigationState(BrowseKind.Parent, person.Name, person.Id), items, true, token);
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex) { ShowMainError("人物作品加载失败", ex); }
+        finally { HideBusy(); }
+    }
+
+    private void PushCurrentBrowseSnapshot()
+    {
+        if (BrowseScroll.Visibility != Visibility.Visible || _currentNavigation is null) return;
+        // Keep the actual list and scroll position in memory. Back navigation should never
+        // wait for HTTP or even metadata-cache deserialization.
+        _navigation.Push(new BrowseSnapshot(
+            _currentNavigation,
+            _browseCards.Select(card => card.Item).ToList(),
+            BrowseScroll.VerticalOffset));
     }
 
     private async Task BrowseIntoAsync(EmbyItem parent)
@@ -513,15 +551,7 @@ public partial class MainWindow : Window
         try
         {
             var items = await _api.GetItemsAsync(parent.Id, token);
-            if (BrowseScroll.Visibility == Visibility.Visible && _currentNavigation is not null)
-            {
-                // Keep the actual list and scroll position in memory. Back navigation should never
-                // wait for HTTP or even metadata-cache deserialization.
-                _navigation.Push(new BrowseSnapshot(
-                    _currentNavigation,
-                    _browseCards.Select(card => card.Item).ToList(),
-                    BrowseScroll.VerticalOffset));
-            }
+            PushCurrentBrowseSnapshot();
             await ShowBrowseAsync(new NavigationState(BrowseKind.Parent, parent.Name, parent.Id), items, true, token);
         }
         catch (OperationCanceledException) { }
@@ -537,14 +567,119 @@ public partial class MainWindow : Window
         BrowseScroll.Visibility = Visibility.Visible;
         BrowseBackButton.Visibility = canGoBack || _navigation.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         BrowseStatusText.Text = $"{items.Count} 项";
+        BrowseEmptyText.Text = state.Kind == BrowseKind.Search ? "没有找到相关内容" : "这里还没有内容";
         BrowseEmptyText.Visibility = items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         BeginViewportImageSession();
         _browseCards = CreateCards(items);
         _browseVisibleCards.Clear();
-        AppendBrowseCards(BrowseInitialRenderCount);
-        BrowseItemsControl.ItemsSource = _browseVisibleCards;
+
+        if (state.Kind == BrowseKind.Search)
+        {
+            // Grouped sections are derived purely from the item list, so the existing
+            // BrowseSnapshot(State, Items, Offset) back stack restores them for free.
+            BrowseItemsControl.Visibility = Visibility.Collapsed;
+            SearchSectionsStack.Visibility = Visibility.Visible;
+            BuildSearchSections(_browseCards);
+            AppendSearchCards(BrowseInitialRenderCount);
+        }
+        else
+        {
+            BrowseItemsControl.Visibility = Visibility.Visible;
+            SearchSectionsStack.Visibility = Visibility.Collapsed;
+            ClearSearchSections();
+            AppendBrowseCards(BrowseInitialRenderCount);
+            BrowseItemsControl.ItemsSource = _browseVisibleCards;
+        }
         Dispatcher.BeginInvoke(new Action(ScheduleBrowseViewport), DispatcherPriority.Loaded);
         return Task.CompletedTask;
+    }
+
+    private bool IsSearchBrowseActive =>
+        _currentNavigation?.Kind == BrowseKind.Search && SearchSectionsStack.Visibility == Visibility.Visible;
+
+    private static readonly (string Title, string[] Types)[] SearchSectionOrder =
+    {
+        ("电影", new[] { "Movie" }),
+        ("剧集", new[] { "Series", "Season" }),
+        ("单集", new[] { "Episode", "Video" }),
+        ("合集", new[] { "BoxSet" }),
+        ("人物", new[] { "Person" }),
+    };
+
+    private void BuildSearchSections(IReadOnlyList<MediaCardViewModel> cards)
+    {
+        SearchSectionsStack.Children.Clear();
+        _searchSections.Clear();
+
+        var assigned = new bool[cards.Count];
+        foreach (var (title, types) in SearchSectionOrder)
+        {
+            var sectionCards = new List<MediaCardViewModel>();
+            for (var i = 0; i < cards.Count; i++)
+            {
+                if (assigned[i]) continue;
+                if (types.Contains(cards[i].Item.Type, StringComparer.OrdinalIgnoreCase))
+                {
+                    sectionCards.Add(cards[i]);
+                    assigned[i] = true;
+                }
+            }
+            if (sectionCards.Count > 0)
+                _searchSections.Add(CreateSearchSection(title, sectionCards));
+        }
+
+        var rest = new List<MediaCardViewModel>();
+        for (var i = 0; i < cards.Count; i++)
+        {
+            if (!assigned[i]) rest.Add(cards[i]);
+        }
+        if (rest.Count > 0)
+            _searchSections.Add(CreateSearchSection("其他", rest));
+    }
+
+    private SearchCardSection CreateSearchSection(string title, List<MediaCardViewModel> sectionCards)
+    {
+        var section = new SearchCardSection(title, sectionCards);
+        SearchSectionsStack.Children.Add(new TextBlock
+        {
+            Text = $"{title}（{sectionCards.Count}）",
+            Style = (Style)FindResource("SectionTitle"),
+            Foreground = Brushes.White,
+            Margin = new Thickness(0, 6, 0, 12)
+        });
+
+        var control = new ItemsControl
+        {
+            ItemTemplate = (DataTemplate)FindResource("PosterCardTemplate"),
+            ItemsPanel = new ItemsPanelTemplate(new FrameworkElementFactory(typeof(WrapPanel))),
+            ItemsSource = section.VisibleCards,
+            Margin = new Thickness(0, 0, 0, 24)
+        };
+        section.ItemsControl = control;
+        SearchSectionsStack.Children.Add(control);
+        return section;
+    }
+
+    private void ClearSearchSections()
+    {
+        _searchSections.Clear();
+        SearchSectionsStack.Children.Clear();
+    }
+
+    private void AppendSearchCards(int count)
+    {
+        // Fill sections in order until the budget runs out. This guarantees every visible
+        // header is followed by rendered cards while the first screen stays cheap.
+        var remaining = count;
+        foreach (var section in _searchSections)
+        {
+            if (remaining <= 0) break;
+            var start = section.VisibleCards.Count;
+            var addCount = Math.Min(remaining, section.Cards.Count - start);
+            for (var i = 0; i < addCount; i++)
+                section.VisibleCards.Add(section.Cards[start + i]);
+            remaining -= addCount;
+        }
     }
 
     private async void BrowseBackButton_Click(object sender, RoutedEventArgs e)
@@ -712,17 +847,31 @@ public partial class MainWindow : Window
 
     private void EnsureBrowseRenderWindow()
     {
-        if (_browseVisibleCards.Count >= _browseCards.Count || BrowseScroll.Visibility != Visibility.Visible) return;
+        if (BrowseScroll.Visibility != Visibility.Visible) return;
         if (BrowseScroll.ExtentHeight <= 0 || BrowseScroll.ViewportHeight <= 0) return;
 
         var remaining = BrowseScroll.ExtentHeight - (BrowseScroll.VerticalOffset + BrowseScroll.ViewportHeight);
-        if (remaining <= PosterCellHeight * 2.5)
+        if (remaining > PosterCellHeight * 2.5) return;
+
+        if (IsSearchBrowseActive)
+        {
+            if (_searchSections.Any(section => section.VisibleCards.Count < section.Cards.Count))
+                AppendSearchCards(BrowseRenderBatchSize);
+            return;
+        }
+        if (_browseVisibleCards.Count < _browseCards.Count)
             AppendBrowseCards(BrowseRenderBatchSize);
     }
 
     private void ScheduleBrowseViewport()
     {
         if (_images is null || _browseCards.Count == 0 || BrowseScroll.Visibility != Visibility.Visible || ViewportImageToken.IsCancellationRequested) return;
+
+        if (IsSearchBrowseActive)
+        {
+            ScheduleSearchViewport();
+            return;
+        }
 
         var width = BrowseScroll.ViewportWidth > 1 ? BrowseScroll.ViewportWidth : Math.Max(700, ActualWidth - 310);
         var columns = Math.Max(1, (int)Math.Floor(width / PosterCellWidth));
@@ -738,6 +887,47 @@ public partial class MainWindow : Window
         var prefetchCount = Math.Min(columns * 2, availableCount - prefetchStart);
         if (prefetchCount > 0)
             ScheduleCardRange(_browseCards, preferBackdrop: false, prefetchStart, prefetchCount, ImageRequestPriority.Prefetch);
+    }
+
+    private void ScheduleSearchViewport()
+    {
+        if (BrowseScroll.ViewportHeight <= 0) return;
+        var viewportTop = BrowseScroll.VerticalOffset;
+        var viewportBottom = viewportTop + BrowseScroll.ViewportHeight;
+        var width = BrowseScroll.ViewportWidth > 1 ? BrowseScroll.ViewportWidth : Math.Max(700, ActualWidth - 310);
+        var columns = Math.Max(1, (int)Math.Floor(width / PosterCellWidth));
+
+        foreach (var section in _searchSections)
+        {
+            var availableCount = section.VisibleCards.Count;
+            if (availableCount == 0) continue;
+
+            // Only sections whose WrapPanel is near the vertical viewport enqueue images.
+            double sectionTop, sectionHeight;
+            try
+            {
+                var point = section.ItemsControl.TranslatePoint(new Point(0, 0), BrowseScroll);
+                sectionTop = point.Y + BrowseScroll.VerticalOffset;
+                sectionHeight = Math.Max(120, section.ItemsControl.ActualHeight);
+            }
+            catch
+            {
+                continue;
+            }
+
+            const double margin = 520;
+            if (sectionTop > viewportBottom + margin || sectionTop + sectionHeight < viewportTop - margin) continue;
+
+            var firstRow = Math.Max(0, (int)Math.Floor((viewportTop - sectionTop) / PosterCellHeight) - 1);
+            var renderedRows = (int)Math.Ceiling((double)availableCount / columns) - 1;
+            var lastRow = Math.Min(renderedRows, (int)Math.Floor((viewportBottom - sectionTop) / PosterCellHeight) + 1);
+            if (lastRow < firstRow) continue;
+
+            var start = firstRow * columns;
+            var count = Math.Min(availableCount - start, (lastRow - firstRow + 1) * columns);
+            if (count > 0)
+                ScheduleCardRange(section.VisibleCards, preferBackdrop: false, start, count, ImageRequestPriority.Visible);
+        }
     }
 
     private void ScheduleCardRange(
@@ -775,20 +965,20 @@ public partial class MainWindow : Window
         try
         {
             // Card-sized requests map to fixed cache buckets inside ImageCacheService:
-            // poster 256px, landscape 512px. This maximizes reuse across pages.
+            // poster 256px, landscape/episode still 512px. This maximizes reuse across pages.
             var isEpisode = string.Equals(card.Item.Type, "Episode", StringComparison.OrdinalIgnoreCase);
+            var posterWidth = isEpisode ? 480 : 220;
 
-            // Episodes have their own 16:9 stills in Emby. Never let a landscape shelf
-            // preference turn every episode into the parent Series/Season backdrop.
-            // The cache key is therefore episodeId + PrimaryTag + width.
-            BitmapSource? image = isEpisode
-                ? await images.GetEpisodePrimaryAsync(card.Item, 480, token, priority).ConfigureAwait(false)
-                : preferBackdrop
-                    ? await images.GetBackdropAsync(card.Item, 480, token, priority).ConfigureAwait(false)
-                    : await images.GetPrimaryAsync(card.Item, 220, token, priority).ConfigureAwait(false);
+            // Episodes keep their own 16:9 stills when the server has them; a landscape shelf
+            // preference must not turn every episode into the parent Series/Season backdrop.
+            // When an episode has no still (common for unscraped libraries), GetCardPosterAsync
+            // falls back to series artwork so the tile is never blank.
+            BitmapSource? image = isEpisode || !preferBackdrop
+                ? await images.GetCardPosterAsync(card.Item, posterWidth, token, priority).ConfigureAwait(false)
+                : await images.GetBackdropAsync(card.Item, 480, token, priority).ConfigureAwait(false);
 
-            if (image is null && !isEpisode)
-                image = await images.GetPrimaryAsync(card.Item, preferBackdrop ? 480 : 220, token, priority).ConfigureAwait(false);
+            if (image is null)
+                image = await images.GetCardPosterAsync(card.Item, preferBackdrop ? 480 : posterWidth, token, priority).ConfigureAwait(false);
             if (token.IsCancellationRequested)
             {
                 card.ResetImageLoad();
@@ -1751,7 +1941,9 @@ public partial class MainWindow : Window
         DetailLogoImage.Source = null;
     }
 
-    private void DetailBackButton_Click(object sender, RoutedEventArgs e)
+    private void DetailBackButton_Click(object sender, RoutedEventArgs e) => RestoreMainPageAfterDetail();
+
+    private void RestoreMainPageAfterDetail()
     {
         CancelCurrentOperation();
         HideDetailSheet();
@@ -1799,7 +1991,34 @@ public partial class MainWindow : Window
     private void ShowMainError(string title, Exception ex)
     {
         LogService.Warning(title, ex);
-        MessageBox.Show(ex.Message, title, MessageBoxButton.OK, MessageBoxImage.Warning);
+        ShowErrorToast(title, ex.Message);
+    }
+
+    private DispatcherTimer? _errorToastTimer;
+
+    private void ShowErrorToast(string title, string message)
+    {
+        MainErrorTitle.Text = title;
+        MainErrorText.Text = message;
+        MainErrorToast.Visibility = Visibility.Visible;
+
+        if (_errorToastTimer is null)
+        {
+            _errorToastTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(4.5) };
+            _errorToastTimer.Tick += (_, _) =>
+            {
+                _errorToastTimer.Stop();
+                MainErrorToast.Visibility = Visibility.Collapsed;
+            };
+        }
+        _errorToastTimer.Stop();
+        _errorToastTimer.Start();
+    }
+
+    private void MainErrorToast_Click(object sender, MouseButtonEventArgs e)
+    {
+        _errorToastTimer?.Stop();
+        MainErrorToast.Visibility = Visibility.Collapsed;
     }
 
     private CancellationToken BeginOperation()
@@ -1893,6 +2112,7 @@ public partial class MainWindow : Window
         _latestEpisodeCards = [];
         _browseCards = [];
         _browseVisibleCards.Clear();
+        ClearSearchSections();
         _detailEpisodeCards = [];
         _detailSimilarCards = [];
         _detailPeople = [];
@@ -1910,9 +2130,30 @@ public partial class MainWindow : Window
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (e.Key != Key.F12) return;
-        DebugConsoleWindow.ShowFor(this);
-        e.Handled = true;
+        if (e.Key == Key.F12)
+        {
+            DebugConsoleWindow.ShowFor(this);
+            e.Handled = true;
+            return;
+        }
+
+        if (Keyboard.Modifiers == ModifierKeys.Control && (e.Key == Key.F || e.Key == Key.K))
+        {
+            FocusSearchBoxFromAnywhere();
+            e.Handled = true;
+        }
+    }
+
+    private void FocusSearchBoxFromAnywhere()
+    {
+        if (_api is null || AppPanel.Visibility != Visibility.Visible) return;
+        if (DetailPage.Visibility == Visibility.Visible)
+            RestoreMainPageAfterDetail();
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            SearchTextBox.Focus();
+            SearchTextBox.SelectAll();
+        }), DispatcherPriority.Input);
     }
 
     private void Window_Closing(object? sender, CancelEventArgs e)
@@ -1923,6 +2164,14 @@ public partial class MainWindow : Window
     }
 
     private sealed record BrowseSnapshot(NavigationState State, IReadOnlyList<EmbyItem> Items, double VerticalOffset);
+
+    private sealed class SearchCardSection(string title, List<MediaCardViewModel> cards)
+    {
+        public string Title { get; } = title;
+        public List<MediaCardViewModel> Cards { get; } = cards;
+        public ObservableCollection<MediaCardViewModel> VisibleCards { get; } = [];
+        public ItemsControl ItemsControl { get; set; } = null!;
+    }
 
     private sealed class SmoothScrollState
     {

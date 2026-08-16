@@ -30,21 +30,46 @@ public sealed class MediaCardViewModel : NotifyObject
         get => _image;
         set
         {
-            if (SetProperty(ref _image, value) && value is not null)
-                Interlocked.Exchange(ref _imageLoadState, 2);
+            if (SetProperty(ref _image, value))
+            {
+                if (value is not null) Interlocked.Exchange(ref _imageLoadState, 2);
+                RaisePropertyChanged(nameof(ShowImageLoading));
+            }
         }
     }
 
-    public bool TryBeginImageLoad() => Interlocked.CompareExchange(ref _imageLoadState, 1, 0) == 0;
+    private bool _isImageLoading;
+
+    /// <summary>True while a network image load for this card is in flight.</summary>
+    public bool IsImageLoading
+    {
+        get => _isImageLoading;
+        private set
+        {
+            if (SetProperty(ref _isImageLoading, value))
+                RaisePropertyChanged(nameof(ShowImageLoading));
+        }
+    }
+
+    public bool ShowImageLoading => _isImageLoading && _image is null;
+
+    public bool TryBeginImageLoad()
+    {
+        var began = Interlocked.CompareExchange(ref _imageLoadState, 1, 0) == 0;
+        if (began) IsImageLoading = true;
+        return began;
+    }
 
     public void CompleteImageLoad(ImageSource? image)
     {
+        IsImageLoading = false;
         if (image is not null) Image = image;
         else Interlocked.Exchange(ref _imageLoadState, 2);
     }
 
     public void ResetImageLoad()
     {
+        IsImageLoading = false;
         if (_image is null) Interlocked.Exchange(ref _imageLoadState, 0);
     }
 

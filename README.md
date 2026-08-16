@@ -1,3 +1,8 @@
+## v0.8.2.19
+- 搜索结果按类型分组（电影/剧集/单集/合集/人物），点击人物可查看其作品列表。
+- 搜索不再清空返回栈；新增 Ctrl+F / Ctrl+K 全局唤起搜索框（详情页下自动先返回主界面）。
+- 新增 dev.ps1 / dev.cmd 一站式开发工具：build / run / pack / verify / clean。
+
 ## v0.8.2.13
 - Optical-align the play triangle without changing its 56x56 hit target.
 - Stabilize Chinese text rendering across browse cards, episode list and player selector popups.
@@ -189,21 +194,24 @@ Windows 桌面 Emby 客户端，基于 .NET 8、WPF、LibVLCSharp。
 - 有界内存 LRU + 磁盘缓存；
 - 大列表只创建当前需要的 WPF 卡片。
 
-## 构建
+## 构建 / 运行 / 打包 / 验证
 
-需要 Windows x64 和 .NET 8 SDK。解压后双击：
-
-```text
-publish-win-x64.cmd
-```
-
-成功后运行：
+需要 Windows x64 和 .NET 8 SDK。日常开发用一站式工具（双击 `dev.cmd` 进入菜单，或命令行）：
 
 ```text
-publish\win-x64\EmbyRemotePlayer.exe
+powershell -ExecutionPolicy Bypass -File dev.ps1 watch    # 实时开发：保存即生效（推荐）
+powershell -ExecutionPolicy Bypass -File dev.ps1 build    # 编译 Release
+powershell -ExecutionPolicy Bypass -File dev.ps1 run      # 编译并运行开发版
+powershell -ExecutionPolicy Bypass -File dev.ps1 pack     # 打包 win-x64 自包含 + dist\ zip
+powershell -ExecutionPolicy Bypass -File dev.ps1 verify   # 验证产物：文件/版本/LibVLC/冒烟启动
+powershell -ExecutionPolicy Bypass -File dev.ps1 clean    # 清理 bin/obj/publish/dist
 ```
 
-必须保留 `publish\win-x64` 目录内的全部 DLL 和 LibVLC 文件。
+- 「改完代码如何立即看到效果」的完整说明（含 watch 热重载行为、三个输出目录的区别、常见坑排查）见 **[docs/开发工作流.md](docs/开发工作流.md)**。
+- 打包产物：`publish\win-x64\EmbyRemotePlayer.exe`；分发 zip 自动生成在 `dist\EmbyRemotePlayer-v<版本>-win-x64.zip`。
+- verify 会启动打包后的 exe 并保持 8 秒确认不崩溃（冒烟测试），随后自动关闭；publish 目录版本过期时会自动重新打包。
+- 分发或拷贝时必须保留整个 `publish\win-x64` 目录（含全部 DLL 和 LibVLC 文件）。
+- 旧入口 `build.ps1` / `publish-win-x64.cmd` 仍然可用。
 
 ## 本地数据
 
@@ -215,10 +223,11 @@ publish\win-x64\EmbyRemotePlayer.exe
 
 ## 快捷键
 
+- Ctrl+F / Ctrl+K：全局搜索（主界面任意位置唤起搜索框）
+- Shift + 鼠标滚轮：横向滚动影片行（首页「继续观看/最新电影/最新剧集」、详情页剧集/人物/相似作品各栏）；不按 Shift 时滚轮滚动整页
 - 空格：播放/暂停
 - 左/右方向键：后退/前进 10 秒
 - 上/下方向键：调节音量
 - F 或 F11：全屏
 - Esc：退出全屏
-- F12：Network Inspector
-"# EmbyPlayer" 
+- F12：Network Inspector 

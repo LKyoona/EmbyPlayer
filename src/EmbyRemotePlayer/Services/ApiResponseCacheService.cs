@@ -60,11 +60,13 @@ public sealed class ApiResponseCacheService : IDisposable
         cancellationToken.ThrowIfCancellationRequested();
 
         var scopedKey = NormalizeKey(key);
+        CachePayload? lastKnown = null;
         if (!forceRefresh)
         {
             var cached = await TryReadAsync(scopedKey, cancellationToken).ConfigureAwait(false);
             if (cached is not null)
             {
+                lastKnown = cached;
                 var age = DateTimeOffset.UtcNow - cached.StoredAtUtc;
                 var explicitlyStale = IsMarkedStale(scopedKey, cached.StoredAtUtc);
                 if (!explicitlyStale && age <= freshFor)
@@ -80,8 +82,27 @@ public sealed class ApiResponseCacheService : IDisposable
             }
         }
 
-        var payload = await RefreshCoalescedAsync(scopedKey, factory, cancellationToken).ConfigureAwait(false);
-        return Materialize<T>(scopedKey, payload);
+        try
+        {
+            var payload = await RefreshCoalescedAsync(scopedKey, factory, cancellationToken).ConfigureAwait(false);
+            return Materialize<T>(scopedKey, payload);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            // A failing server must never blank a page we have shown before: fall back to the
+            // last snapshot for this endpoint — however old — instead of surfacing an error.
+            if (lastKnown is not null)
+            {
+                LogService.Warning($"Serving the last cached snapshot for {key} after a refresh failure.", ex);
+                try { return Materialize<T>(scopedKey, lastKnown); }
+                catch { throw; }
+            }
+            throw;
+        }
     }
 
     public async Task<T?> TryGetAnyAsync<T>(string key, TimeSpan maxAge, CancellationToken cancellationToken = default)
