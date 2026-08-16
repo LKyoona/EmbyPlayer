@@ -258,6 +258,7 @@
                                 <TextBlock Text="Emby" Foreground="White" FontSize="22" FontWeight="Bold" VerticalAlignment="Center" Margin="10,0,0,1"/>
                             </StackPanel>
                             <TextBlock x:Name="CurrentServerText" Foreground="#FF8C8C8C" FontSize="12" Margin="0,8,0,0" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock x:Name="AppVersionText" Foreground="#66FFFFFF" FontSize="11" Margin="0,4,0,0"/>
                         </StackPanel>
                         <StackPanel Grid.Row="1" Margin="0,29,0,0">
                             <Button Content="⌂  首页" Style="{StaticResource NavButton}" Click="HomeButton_Click"/>

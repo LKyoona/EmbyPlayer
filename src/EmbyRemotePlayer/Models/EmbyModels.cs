@@ -8,12 +8,16 @@ namespace EmbyRemotePlayer.Models;
 /// </summary>
 public static class ItemNameCleaner
 {
-    private static readonly Regex ProviderTag = new(@"\{\s*[A-Za-z]+-[A-Za-z0-9]+\s*\}", RegexOptions.Compiled);
+    // Matches scraper/provider tags embedded by file-naming tools in curly or square
+    // brackets, e.g. "{tmdb-69740}", "[imdb-tt2119547]", "｛douban-247｝"-style half-width forms.
+    private static readonly Regex ProviderTag = new(
+        @"[\{\[]\s*[A-Za-z]+-[A-Za-z0-9]+\s*[\}\]]",
+        RegexOptions.Compiled);
 
     public static string Clean(string name)
     {
-        var cleaned = ProviderTag.Replace(name, string.Empty);
-        return string.IsNullOrWhiteSpace(cleaned) ? name.Trim() : cleaned.Trim();
+        var cleaned = ProviderTag.Replace(name, string.Empty).Trim(' ', '.', '-', '_');
+        return string.IsNullOrWhiteSpace(cleaned) ? name.Trim() : cleaned;
     }
 }
 

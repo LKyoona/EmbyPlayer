@@ -56,6 +56,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        AppVersionText.Text = $"v{typeof(MainWindow).Assembly.GetName().Version?.ToString(3)}";
         App.ConfigureAdaptiveWindow(
             this,
             widthRatio: 0.90,
@@ -552,9 +553,19 @@ public partial class MainWindow : Window
         ShowBusy("正在加载内容…");
         try
         {
-            var items = await _api.GetItemsAsync(parent.Id, token);
+            IReadOnlyList<EmbyItem> items = await _api.GetItemsAsync(parent.Id, token);
+            items = DeduplicateBrowseItems(items);
             PushCurrentBrowseSnapshot();
-            await ShowBrowseAsync(new NavigationState(BrowseKind.Parent, parent.Name, parent.Id), items, true, token);
+
+            // Single-file movie folders: skip the one-card intermediate list and open the
+            // detail page directly; 返回 still returns to the list we just left.
+            if (items.Count == 1 && items[0].CanPlay && !items[0].CanBrowse)
+            {
+                await ShowDetailsAsync(items[0]);
+                return;
+            }
+
+            await ShowBrowseAsync(new NavigationState(BrowseKind.Parent, parent.DisplayName, parent.Id), items, true, token);
         }
         catch (OperationCanceledException) { }
         catch (Exception ex) { ShowMainError("内容加载失败", ex); }
@@ -651,7 +662,11 @@ public partial class MainWindow : Window
         if (string.IsNullOrWhiteSpace(item.Name)) return null;
         var name = TrailingYearPattern.Replace(ItemNameCleaner.Clean(item.Name!), string.Empty).Trim();
         if (name.Length == 0) return null;
-        return $"{item.Type}|{item.ProductionYear ?? 0}|{item.SeriesId}|{item.ParentIndexNumber ?? 0}|{item.IndexNumber ?? 0}|{name}";
+
+        // Unscraped movies come back as Type "Video" while their properly scraped twin is a
+        // "Movie" — normalize both into one video group or the duplicate check never fires.
+        var typeGroup = item.Type is "Movie" or "Video" or "MusicVideo" ? "V" : item.Type;
+        return $"{typeGroup}|{item.ProductionYear ?? 0}|{item.SeriesId}|{item.ParentIndexNumber ?? 0}|{item.IndexNumber ?? 0}|{name}";
     }
 
     private bool IsSearchBrowseActive =>

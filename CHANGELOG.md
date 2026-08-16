@@ -1,3 +1,9 @@
+## 0.8.3.2
+- Single-file movie folders now open the detail page directly — no more one-card intermediate list that needs a second click; 返回 still returns to the previous list.
+- Duplicate detection normalizes Movie/Video types: an unscraped "Video" twin of a scraped "Movie" (same cleaned title + year) is now collapsed — previously the type mismatch defeated the check.
+- Title cleaning also strips square-bracket scraper tags and trailing separator noise.
+- The sidebar now shows the app version, so it is always obvious which build is running.
+
 ## 0.8.3.1
 - Client-side dedupe for shared-server duplicate entries: the same title listed twice (a properly scraped item plus a raw-filename "{tmdb-…}" item pointing at the same provider id) now collapses into one card, preferring the entry with artwork. Applies to every browse path (library, favorites, search, person works).
 - Display titles strip scraper/provider tags (e.g. "21座桥 (2019) {tmdb-69740}" → "21座桥 (2019)") across cards, detail pages and episode subtitles.
