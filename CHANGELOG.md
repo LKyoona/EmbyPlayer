@@ -1,3 +1,6 @@
+## 0.8.2.25
+- Mismatched-aspect card artwork now renders over a blurred self-fill: the complete sharp image (Uniform) sits on a dimmed blurred copy of itself that fills the tile, replacing the plain dark letterbox bars. Cards whose aspect already matches the tile keep zero-effect rendering.
+
 ## 0.8.2.24
 - Card images now use aspect-correct letterboxing (Stretch=Uniform) on the dark tile instead of hard-cropping. Fallback artwork with mismatched aspect ratios (16:9 backdrops in 2:3 poster tiles, series posters in 16:9 episode tiles) previously lost most of the image to cropping; they now display complete with dark bars.
 

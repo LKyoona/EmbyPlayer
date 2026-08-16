@@ -56,9 +56,14 @@
                                 <Ellipse Canvas.Left="40" Canvas.Top="4" Width="12" Height="12" Fill="#59FFFFFF"/>
                                 <Polygon Points="2,44 22,18 36,34 46,24 62,44" Fill="#3DFFFFFF"/>
                             </Canvas>
-                            <!-- Uniform (never UniformToFill): fallback artwork often has a mismatched
-                                 aspect ratio (16:9 backdrops in 2:3 poster tiles); hard-cropping sliced
-                                 most of the image away. Letterbox on the dark tile instead. -->
+                            <!-- Mismatched-aspect fallback artwork renders complete (Uniform) over a
+                                 blurred self-fill; matched posters collapse the blur layer for free. -->
+                            <Image Source="{Binding Image}" Stretch="UniformToFill" Opacity="0.45"
+                                   Visibility="{Binding Image, Converter={x:Static vm:ImageAspectMismatchConverter.Instance}, ConverterParameter=0.695}">
+                                <Image.Effect>
+                                    <BlurEffect Radius="30" RenderingBias="Performance"/>
+                                </Image.Effect>
+                            </Image>
                             <Image Source="{Binding Image}" Stretch="Uniform"/>
                             <Path x:Name="LoadingArc" Data="M 11 2.5 A 8.5 8.5 0 0 1 19.5 11" Stroke="#99FFFFFF" StrokeThickness="2.2"
                                   StrokeStartLineCap="Round" StrokeEndLineCap="Round" Width="22" Height="22"
@@ -110,6 +115,12 @@
                                 <Ellipse Canvas.Left="50" Canvas.Top="6" Width="14" Height="14" Fill="#59FFFFFF"/>
                                 <Polygon Points="2,52 27,21 44,40 57,28 78,52" Fill="#3DFFFFFF"/>
                             </Canvas>
+                            <Image Source="{Binding Image}" Stretch="UniformToFill" Opacity="0.45"
+                                   Visibility="{Binding Image, Converter={x:Static vm:ImageAspectMismatchConverter.Instance}, ConverterParameter=1.778}">
+                                <Image.Effect>
+                                    <BlurEffect Radius="34" RenderingBias="Performance"/>
+                                </Image.Effect>
+                            </Image>
                             <Image Source="{Binding Image}" Stretch="Uniform"/>
                             <Path x:Name="LoadingArc" Data="M 13 3 A 10 10 0 0 1 23 13" Stroke="#99FFFFFF" StrokeThickness="2.4"
                                   StrokeStartLineCap="Round" StrokeEndLineCap="Round" Width="26" Height="26"
