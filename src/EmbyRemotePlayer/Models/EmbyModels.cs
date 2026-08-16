@@ -1,4 +1,21 @@
+using System.Text.RegularExpressions;
+
 namespace EmbyRemotePlayer.Models;
+
+/// <summary>
+/// Messy/shared servers often keep raw filenames as item names, including scraper tags
+/// like "21座桥 (2019) {tmdb-69740}". Strip those tags wherever titles are displayed.
+/// </summary>
+public static class ItemNameCleaner
+{
+    private static readonly Regex ProviderTag = new(@"\{\s*[A-Za-z]+-[A-Za-z0-9]+\s*\}", RegexOptions.Compiled);
+
+    public static string Clean(string name)
+    {
+        var cleaned = ProviderTag.Replace(name, string.Empty);
+        return string.IsNullOrWhiteSpace(cleaned) ? name.Trim() : cleaned.Trim();
+    }
+}
 
 public sealed class PublicSystemInfo
 {
@@ -121,6 +138,9 @@ public sealed class EmbyItem
     public UserItemData? UserData { get; set; }
     public List<MediaSourceInfo>? MediaSources { get; set; }
     public List<MediaStreamInfo>? MediaStreams { get; set; }
+
+    [JsonIgnore]
+    public string DisplayName => string.IsNullOrWhiteSpace(Name) ? "未命名媒体" : ItemNameCleaner.Clean(Name!);
 
     [JsonIgnore]
     public string? OwnPrimaryImageTag =>

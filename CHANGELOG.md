@@ -1,3 +1,7 @@
+## 0.8.3.1
+- Client-side dedupe for shared-server duplicate entries: the same title listed twice (a properly scraped item plus a raw-filename "{tmdb-…}" item pointing at the same provider id) now collapses into one card, preferring the entry with artwork. Applies to every browse path (library, favorites, search, person works).
+- Display titles strip scraper/provider tags (e.g. "21座桥 (2019) {tmdb-69740}" → "21座桥 (2019)") across cards, detail pages and episode subtitles.
+
 ## 0.8.3.0
 - Content-driven card layout — no tile ever hosts a mismatched aspect ratio anymore:
   - Pure episode/video lists (season pages, episode-heavy libraries) now render as a 16:9 landscape card grid instead of squeezing stills into 2:3 poster tiles.

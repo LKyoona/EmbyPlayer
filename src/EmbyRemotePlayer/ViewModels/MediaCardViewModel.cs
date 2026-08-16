@@ -76,7 +76,7 @@ public sealed class MediaCardViewModel : NotifyObject
     private static string BuildTitle(EmbyItem item)
     {
         if (item.Type == "Episode" && !string.IsNullOrWhiteSpace(item.SeriesName)) return item.SeriesName;
-        return string.IsNullOrWhiteSpace(item.Name) ? "未命名媒体" : item.Name;
+        return item.DisplayName;
     }
 
     private static string BuildSubtitle(EmbyItem item)
@@ -86,7 +86,7 @@ public sealed class MediaCardViewModel : NotifyObject
             var episode = item.ParentIndexNumber is not null && item.IndexNumber is not null
                 ? $"S{item.ParentIndexNumber:00}E{item.IndexNumber:00}"
                 : "单集";
-            return string.IsNullOrWhiteSpace(item.Name) ? episode : $"{episode} · {item.Name}";
+            return string.IsNullOrWhiteSpace(item.Name) ? episode : $"{episode} · {item.DisplayName}";
         }
 
         var parts = new List<string>();

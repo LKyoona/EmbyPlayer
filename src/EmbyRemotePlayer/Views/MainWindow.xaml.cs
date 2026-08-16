@@ -563,6 +563,9 @@ public partial class MainWindow : Window
 
     private Task ShowBrowseAsync(NavigationState state, IReadOnlyList<EmbyItem> items, bool canGoBack, CancellationToken token)
     {
+        // Shared servers sometimes list the same title twice (a properly scraped entry plus a
+        // raw-filename "{tmdb-…}" entry pointing at the same movie). Collapse those before rendering.
+        items = DeduplicateBrowseItems(items);
         _currentNavigation = state;
         HeaderTitleText.Text = state.Title;
         HomeScroll.Visibility = Visibility.Collapsed;
@@ -613,6 +616,43 @@ public partial class MainWindow : Window
 
     private static bool IsLandscapeCardItem(EmbyItem item) =>
         item.Type is "Episode" or "Video" or "MusicVideo" or "Trailer";
+
+    private static readonly System.Text.RegularExpressions.Regex TrailingYearPattern =
+        new(@"\s*\(\d{4}\)\s*$", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    private static IReadOnlyList<EmbyItem> DeduplicateBrowseItems(IReadOnlyList<EmbyItem> items)
+    {
+        if (items.Count < 2) return items;
+
+        var result = new List<EmbyItem>(items.Count);
+        var indexByKey = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in items)
+        {
+            var key = BuildDedupeKey(item);
+            if (key is not null && indexByKey.TryGetValue(key, out var index))
+            {
+                // Keep one entry per title — preferring the one that carries artwork.
+                var existing = result[index];
+                if (string.IsNullOrWhiteSpace(existing.OwnPrimaryImageTag) &&
+                    !string.IsNullOrWhiteSpace(item.OwnPrimaryImageTag))
+                {
+                    result[index] = item;
+                }
+                continue;
+            }
+            if (key is not null) indexByKey[key] = result.Count;
+            result.Add(item);
+        }
+        return result;
+    }
+
+    private static string? BuildDedupeKey(EmbyItem item)
+    {
+        if (string.IsNullOrWhiteSpace(item.Name)) return null;
+        var name = TrailingYearPattern.Replace(ItemNameCleaner.Clean(item.Name!), string.Empty).Trim();
+        if (name.Length == 0) return null;
+        return $"{item.Type}|{item.ProductionYear ?? 0}|{item.SeriesId}|{item.ParentIndexNumber ?? 0}|{item.IndexNumber ?? 0}|{name}";
+    }
 
     private bool IsSearchBrowseActive =>
         SearchSectionsStack.Visibility == Visibility.Visible && _searchSections.Count > 0;
@@ -1602,7 +1642,7 @@ public partial class MainWindow : Window
     private static string BuildDetailTitle(EmbyItem item) =>
         string.Equals(item.Type, "Episode", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(item.SeriesName)
             ? item.SeriesName!
-            : item.Name;
+            : item.DisplayName;
 
     private static string BuildSecondaryTitle(EmbyItem item)
     {
