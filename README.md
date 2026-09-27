@@ -1,3 +1,13 @@
+# Emby Remote Player
+
+Windows 桌面级 Emby 媒体客户端，基于 .NET 8、WPF 与 LibVLCSharp 构建。
+
+## v0.9.0.1 — 播放链路与稳定性热修复
+- **数据层过滤**：针对特定代理源将未刮削电影暴露为“真实 Movie + Folder 壳”导致 410 的问题，查询强制使用 `Recursive=true + IncludeItemTypes=Movie,Series` 类型化过滤。
+- **逻辑层下钻**：新增 `ResolvePlayableItemAsync`，点击非直接可播条目自动递归解析到首个可播视频，杜绝抛出不可播放异常。
+- **传输层稳定**：移除与边缘 Nginx 互斥的 `:http-continuous` VLC 选项，解决首个 Range 响应后被掐断连接卡在 Opening 的问题。
+- **身份合规**：不再默认注入浏览器 UA / Referer，遵守白名单防断流规则；媒体源明确要求时才按需注入。
+
 ## v0.9.0.0 — 影视平台级首页升级
 - **Hero 轮播看板**：首页顶部 ~440DIP 沉浸式大图展示，双层 450ms 平滑交叉淡入淡出、1600px 高清剧照、透明 Logo（无 Logo 回退大字标题）、评分/类型/时长元数据、三行简介，支持「▶ 立即播放」直达播放器与「ⓘ 更多信息」进详情，8 秒智能轮播。
 - **动态内容行引擎**：取代原固定的三行布局，根据数据实时呈现多达 6~8 行平台级内容（空行或异常自动隐藏自愈）：
@@ -14,72 +24,50 @@
 ## v0.8.2.19
 - 搜索结果按类型分组（电影/剧集/单集/合集/人物），点击人物可查看其作品列表。
 - 搜索不再清空返回栈；新增 Ctrl+F / Ctrl+K 全局唤起搜索框（详情页下自动先返回主界面）。
-- 新增 dev.ps1 / dev.cmd 一站式开发工具：build / run / pack / verify / clean。
+- 新增 dev.cmd / prod.cmd 一站式开发与发布工具：watch / run / pack / verify / clean。
 
 ## v0.8.2.13
-- Optical-align the play triangle without changing its 56x56 hit target.
-- Stabilize Chinese text rendering across browse cards, episode list and player selector popups.
-- Remove parent-level popup/title effects that rasterized text and caused blur on some DPI/GPU configurations.
+- 播放三角图标进行光学居中对齐，同时保持 56x56 DIP 点击响应区域。
+- 优化媒体浏览卡片、剧集列表及弹出菜单中的中文字体渲染稳定性。
+- 移除部分导致高 DPI/GPU 配置下文字栅格化模糊的父级 Popup/标题阴影特效。
 
-v0.8.2.8 — control bar visual polish: compact bold double-chevron ±10s icons, frameless 48px hit targets, crisp right-side icons; all capability-driven visibility and playback handlers preserved.
+## v0.8.2.8 — 控制栏视觉微调
+- 紧凑型加粗双尖括号 ±10s 快捷跳转图标，无边框 48px 点击响应区，保留右侧功能图标与完整播放能力。
 
-v0.8.2.7 — rewind/forward 10-second controls use one canonical glyph with an exact horizontal mirror for optical symmetry.
+## v0.8.2.7 — 快进退对称优化
+- 快进/快退 10 秒控件采用统一的标准字形，水平镜像翻转实现视觉光学对称。
 
-v0.8.2.6 — media source selector uses a fixed switch icon; no misleading 720/1080/4K badge.
+## v0.8.2.6 — 媒体源切换图标
+- 媒体版本切换控件改用固定切换图标，避免误导性的 720/1080/4K 伪标签。
 
-v0.8.2.5 Media Source Switching
+## v0.8.2.5 — 媒体源无缝切换
+- 支持在播放器内切换 Emby 不同的媒体版本与流来源，无缝保留当前播放进度与状态。
 
-- Player can switch between Emby PlaybackInfo media versions/sources while preserving playback position and state.
+## v0.8.2.4 — 键盘快捷键与交互优化
+- 快捷键支持：Space / Enter / K 播放/暂停；Left / J 后退10秒；Right / L 快进10秒；Up / Down 音量调节；M 静音；F / F11 切换全屏；Esc 关闭浮层或退出全屏；C 切换字幕；Shift+< / Shift+> 调整播放倍速；0-9 快速定位到 0%-90% 进度；Home / End 跳转到开头/结尾；Shift+N / P 切换下一集/上一集。
 
-v0.8.2.4 Keyboard & Interaction Polish
+## v0.8.2.2 — 控制栏右侧点击区域扩展
+- 将播放器右侧控制区域扩展为 54×50 DIP 大点击热区，消除按钮之间的死区，支持高分屏下的顺畅悬停与点击反馈。
 
-Keyboard: Space/Enter/K play-pause; Left/J -10s; Right/L +10s; Up/Down volume; M mute; F/F11 fullscreen; Esc closes popup/panel or exits fullscreen; C subtitles; Shift+< / Shift+> speed; 0-9 seek 0%-90%; Home/End start/end; Shift+N/P next/previous episode when available.
+## v0.8.2.1 — 进度条即点即跳
+- 进度条单击（MouseDown）立即发起 Seek 定位，优化拖动判定逻辑。
 
-v0.8.2.3 Track Click Seek Fix
+## v0.8.1.9 — 进度悬停预览高分屏适配
+- 修复 Windows DPI 缩放下的时间预览漂移问题，鼠标悬停当前播放头时准确预览当前时间。
 
-v0.8.2.2 Right-control hit targets
-
-- Expanded right-side player controls to 54×50 DIP hit targets.
-- Removed dead gaps between audio, subtitle, speed, episode/quality, and fullscreen controls.
-- Kept glyphs visually restrained while making the entire transparent control surface clickable.
-- Added full-area hover/pressed feedback for easier targeting on high-DPI displays.
-
-v0.8.2.1 Immediate click-to-seek
-
-- Progress-rail single click now commits SeekToAsync immediately on MouseDown.
-- Thumb drag remains DragStarted/DragDelta/DragCompleted.
-- Removed the fragile pseudo-drag MouseCapture/MouseUp path for simple rail clicks.
-
-v0.8.2.0 Seek + video hit-test fix
-
-## v0.8.1.9 - Seek preview DPI/stability fix
-
-- Fixed seek preview time drift/jitter under Windows DPI scaling.
-- Hovering the current playhead now previews the exact current Slider value.
-- Win32 cursor polling no longer competes with WPF hover preview updates.
-
-## v0.8.1.7 - Episode panel hotfix
-
-- Restored the missing `EpisodeItemButton` XAML resource used by the lazy-created episode list.
-- Added a full PlayerWindow StaticResource resolution validation step.
-
-# Emby Remote Player v0.8.1.6
+## v0.8.1.7 — 剧集面板资源修复
+- 恢复延迟创建剧集列表所需的 `EpisodeItemButton` XAML 资源，加入静态资源加载校验。
 
 ## v0.8.1.6 — 播放器交互与侧栏收口
-
 - 视频画面点击使用 VideoView 屏幕矩形 + 交互控件排除策略，不再依赖 LibVLC HWND 命中，因此画面非控件区域单击暂停/继续更稳定。
 - 播放器移除原生 WPF ToolTip Popup，避免按钮悬停出现白色系统提示板。
 - 剧集面板改成更窄的半透明浮层，增加圆角、轻阴影、Hover 和当前集高亮。
 - 实时网速移入右侧工具组，降低对画面的干扰。
 - 底部控制栏进一步靠近屏幕底部，并重新拉开播放、快进退和音量之间的分组间距。
 
-
-## v0.8.1 — Liquid progress UI
-
-- Reworked player bottom panel from the supplied visual reference: toolbar above, liquid-glow seek rail below, node-following timestamp and capsule volume slider.
-- Kept playback, MVVM commands, seek behavior, controls auto-hide, episodes/audio/subtitles and fullscreen logic unchanged.
-
-# Emby Remote Player v0.8.1
+## v0.8.1 — 流光进度条 UI
+- 底部控制区重构：上方工具栏、下方流光感进度轨、跟随节点的悬浮时间戳与胶囊音量条。
+- 保持底层播放、MVVM 命令绑定、Seek 行为、控制栏自动隐藏、选集/音轨/字幕与全屏逻辑稳定一致。
 
 ## v0.8.0：播放器 MVVM / 真全屏 / 稳定 Slider
 
