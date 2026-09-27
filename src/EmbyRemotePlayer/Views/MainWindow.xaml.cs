@@ -51,10 +51,10 @@ public partial class MainWindow : Window
 
     private const int BrowseInitialRenderCount = 36;
     private const int BrowseRenderBatchSize = 24;
-    private const double PosterCellWidth = 208;
-    private const double PosterCellHeight = 284;
-    private const double LandscapeCellWidth = 398;
-    private const double LandscapeCellHeight = 195;
+    private const double PosterCellWidth = 198;
+    private const double PosterCellHeight = 285;
+    private const double LandscapeCellWidth = 354;
+    private const double LandscapeCellHeight = 205;
 
     private readonly Dictionary<ScrollViewer, SmoothScrollState> _smoothScrollStates = new();
     private readonly DispatcherTimer _smoothScrollTimer;
@@ -343,7 +343,6 @@ public partial class MainWindow : Window
         {
             LoadNextUpHomeSectionAsync(token),
             LoadResumeHomeSectionAsync(token),
-            LoadSuggestionsHomeSectionAsync(token),
             LoadLatestMoviesHomeSectionAsync(token),
             LoadLatestEpisodesHomeSectionAsync(token),
             LoadTopRatedHomeSectionAsync(token),
@@ -409,23 +408,6 @@ public partial class MainWindow : Window
         {
             LogService.Warning("Continue-watching section failed to load.", ex);
             RemoveHomeRow("resume");
-        }
-    }
-
-    private async Task LoadSuggestionsHomeSectionAsync(CancellationToken token)
-    {
-        if (_api is null) return;
-        try
-        {
-            var items = await _api.GetSuggestionsAsync(limit: 16, cancellationToken: token);
-            UpsertHomeRow("suggestions", rank: 30, "为你推荐", "根据观影品味智能精选", "推荐", isLandscape: false, items);
-        }
-        catch (OperationCanceledException) { throw; }
-        catch (EmbyApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized) { throw; }
-        catch (Exception ex)
-        {
-            LogService.Warning("Suggestions section failed to load.", ex);
-            RemoveHomeRow("suggestions");
         }
     }
 
@@ -589,7 +571,6 @@ public partial class MainWindow : Window
 
         AddFromRow("nextup", 1);
         AddFromRow("resume", 1);
-        AddFromRow("suggestions", 2);
         AddFromRow("top-rated", 2);
         AddFromRow("latest-movies", 2);
 
@@ -1569,12 +1550,23 @@ public partial class MainWindow : Window
             // preference must not turn every episode into the parent Series/Season backdrop.
             // When an episode has no still (common for unscraped libraries), GetCardPosterAsync
             // falls back to series artwork so the tile is never blank.
-            BitmapSource? image = isEpisode || !preferBackdrop
-                ? await images.GetCardPosterAsync(card.Item, posterWidth, token, priority).ConfigureAwait(false)
-                : await images.GetBackdropAsync(card.Item, 480, token, priority).ConfigureAwait(false);
+            BitmapSource? image = null;
+            if (isEpisode)
+            {
+                image = await images.GetCardPosterAsync(card.Item, posterWidth, token, priority).ConfigureAwait(false)
+                        ?? await images.GetBackdropAsync(card.Item, 480, token, priority).ConfigureAwait(false);
+            }
+            else if (preferBackdrop)
+            {
+                image = await images.GetBackdropAsync(card.Item, 480, token, priority).ConfigureAwait(false)
+                        ?? await images.GetCardPosterAsync(card.Item, 480, token, priority).ConfigureAwait(false);
+            }
+            else
+            {
+                image = await images.GetCardPosterAsync(card.Item, posterWidth, token, priority).ConfigureAwait(false)
+                        ?? await images.GetBackdropAsync(card.Item, 480, token, priority).ConfigureAwait(false);
+            }
 
-            if (image is null)
-                image = await images.GetCardPosterAsync(card.Item, preferBackdrop ? 480 : posterWidth, token, priority).ConfigureAwait(false);
             if (token.IsCancellationRequested)
             {
                 card.ResetImageLoad();
@@ -1584,7 +1576,7 @@ public partial class MainWindow : Window
             await Dispatcher.InvokeAsync(() =>
             {
                 if (image is not null) card.CompleteImageLoad(image);
-                else card.ResetImageLoad();
+                else card.CompleteImageLoad(null);
             }, DispatcherPriority.Background, token);
         }
         catch (OperationCanceledException)
@@ -1593,7 +1585,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            card.ResetImageLoad();
+            card.CompleteImageLoad(null);
             LogService.Warning($"Card image load failed for {card.Item.Id}.", ex);
         }
     }
@@ -2740,8 +2732,6 @@ public partial class MainWindow : Window
                 await LoadNextUpHomeSectionAsync(token);
             else if (endpoint.Contains("/Items/Resume", StringComparison.OrdinalIgnoreCase) || endpoint.Contains("Filters=IsResumable", StringComparison.OrdinalIgnoreCase))
                 await LoadResumeHomeSectionAsync(token);
-            else if (endpoint.Contains("/Suggestions", StringComparison.OrdinalIgnoreCase))
-                await LoadSuggestionsHomeSectionAsync(token);
             else if (endpoint.Contains("/Items/Latest", StringComparison.OrdinalIgnoreCase) && endpoint.Contains("IncludeItemTypes=Movie", StringComparison.OrdinalIgnoreCase))
                 await LoadLatestMoviesHomeSectionAsync(token);
             else if (endpoint.Contains("/Items/Latest", StringComparison.OrdinalIgnoreCase) && endpoint.Contains("IncludeItemTypes=Episode", StringComparison.OrdinalIgnoreCase))

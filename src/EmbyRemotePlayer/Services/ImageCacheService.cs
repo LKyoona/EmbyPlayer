@@ -91,10 +91,15 @@ public sealed class ImageCacheService : IDisposable
             var still = await GetEpisodePrimaryAsync(item, maxWidth, cancellationToken, priority).ConfigureAwait(false);
             if (still is not null) return still;
 
-            // Broken image enhancers often fail only for the episode still while the
-            // series poster remains healthy. Prefer a real parent poster over an empty
-            // placeholder when the server has supplied the series image identity.
-            if (!string.IsNullOrWhiteSpace(item.SeriesId))
+            // Episode cards are typically 16:9 landscape. If the episode lacks its own still,
+            // fall back directly to the parent Series/Season backdrop or series poster.
+            if (!string.IsNullOrWhiteSpace(item.ParentBackdropItemId) && item.ParentBackdropImageTags is { Count: > 0 })
+            {
+                var parentBackdrop = await GetAsync(item.ParentBackdropItemId, "Backdrop", item.ParentBackdropImageTags[0], maxWidth, cancellationToken, priority).ConfigureAwait(false);
+                if (parentBackdrop is not null) return parentBackdrop;
+            }
+
+            if (!string.IsNullOrWhiteSpace(item.SeriesId) && !string.IsNullOrWhiteSpace(item.SeriesPrimaryImageTag))
             {
                 var seriesPoster = await GetPrimaryByIdAsync(item.SeriesId!, item.SeriesPrimaryImageTag, maxWidth, cancellationToken, priority).ConfigureAwait(false);
                 if (seriesPoster is not null) return seriesPoster;
@@ -126,15 +131,12 @@ public sealed class ImageCacheService : IDisposable
         if (!string.Equals(item.Type, "Episode", StringComparison.OrdinalIgnoreCase))
             return GetPrimaryAsync(item, maxWidth, cancellationToken, priority);
 
-        // Some list endpoints (notably Resume on some Emby servers) omit ImageTags even
-        // though /Items/{episodeId}/Images/Primary exists. In that case request the
-        // episode image without a tag, but keep a per-episode cache identity so different
-        // episodes can never alias to one Series/Season image.
-        var cacheIdentity = item.OwnPrimaryImageTag
-                            ?? item.Etag
-                            ?? item.PresentationUniqueKey
-                            ?? "episode-current";
-        return GetAsyncCore(item.Id, "Primary", item.OwnPrimaryImageTag, cacheIdentity, maxWidth, cancellationToken, priority);
+        // Never blindly request /Images/Primary if the server explicitly told us it has no Primary tag.
+        // On proxy/custom servers, requesting missing episode stills throws HTTP 500 (NullReferenceException).
+        if (string.IsNullOrWhiteSpace(item.OwnPrimaryImageTag))
+            return Task.FromResult<BitmapSource?>(null);
+
+        return GetAsyncCore(item.Id, "Primary", item.OwnPrimaryImageTag, item.OwnPrimaryImageTag, maxWidth, cancellationToken, priority);
     }
 
     public Task<BitmapSource?> GetBackdropAsync(
@@ -149,8 +151,11 @@ public sealed class ImageCacheService : IDisposable
         string? tag,
         int maxWidth,
         CancellationToken cancellationToken = default,
-        ImageRequestPriority priority = ImageRequestPriority.Visible) =>
-        GetAsyncCore(itemId, "Primary", tag, tag ?? $"primary-{itemId}", maxWidth, cancellationToken, priority);
+        ImageRequestPriority priority = ImageRequestPriority.Visible)
+    {
+        if (string.IsNullOrWhiteSpace(tag)) return Task.FromResult<BitmapSource?>(null);
+        return GetAsyncCore(itemId, "Primary", tag, tag, maxWidth, cancellationToken, priority);
+    }
 
     public Task<BitmapSource?> GetAsync(
         string itemId,
@@ -282,8 +287,8 @@ public sealed class ImageCacheService : IDisposable
                     // A definitive "no image" answer or a server-side failure must not be re-requested
                     // on every viewport pass — one grid scroll used to fire hundreds of duplicate 404/500s.
                     // Short-lived negative caching keeps scrolling cheap while a later retry can still win.
-                    var negativeTtl = ex is EmbyApiException { StatusCode: HttpStatusCode.NotFound }
-                        ? TimeSpan.FromMinutes(10)
+                    var negativeTtl = ex is EmbyApiException { StatusCode: HttpStatusCode.NotFound or HttpStatusCode.InternalServerError }
+                        ? TimeSpan.FromMinutes(30)
                         : TimeSpan.FromSeconds(90);
                     PutMemory(request.Key, null, DateTimeOffset.UtcNow + negativeTtl);
                     request.Completion.TrySetResult(null);

@@ -768,10 +768,10 @@ public sealed class EmbyApiClient : IDisposable
                 return await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
 
             var canTryCompatibleRoute = index < endpoints.Count - 1
-                                        && (response.StatusCode == HttpStatusCode.InternalServerError
-                                            || response.StatusCode == HttpStatusCode.BadGateway
+                                        && (response.StatusCode == HttpStatusCode.BadGateway
                                             || response.StatusCode == HttpStatusCode.ServiceUnavailable
-                                            || response.StatusCode == HttpStatusCode.GatewayTimeout);
+                                            || response.StatusCode == HttpStatusCode.GatewayTimeout
+                                            || (response.StatusCode == HttpStatusCode.InternalServerError && index == 0 && !string.IsNullOrWhiteSpace(tag)));
             if (canTryCompatibleRoute) continue;
 
             await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);

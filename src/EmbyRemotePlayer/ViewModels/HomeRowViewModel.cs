@@ -25,9 +25,9 @@ public sealed class HomeRowViewModel(string key, int rank, string title, string 
 
     /// <summary>
     /// Footprint width in DIPs (Card Width + MarginRight) matching MainWindow.xaml:
-    /// Landscape: 380 + 18 = 398, Poster: 190 + 18 = 208.
+    /// Landscape: 336 + 18 = 354, Poster: 182 + 16 = 198.
     /// </summary>
-    public double CellWidth => IsLandscape ? 398 : 208;
+    public double CellWidth => IsLandscape ? 354 : 198;
 
     public bool PreferBackdrop => IsLandscape;
 
