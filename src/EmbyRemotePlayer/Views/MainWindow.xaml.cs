@@ -57,7 +57,9 @@ public partial class MainWindow : Window
     private const double LandscapeCellHeight = 205;
 
     private readonly Dictionary<ScrollViewer, SmoothScrollState> _smoothScrollStates = new();
-    private readonly DispatcherTimer _smoothScrollTimer;
+    private readonly System.Diagnostics.Stopwatch _scrollStopwatch = new();
+    private TimeSpan _lastRenderingTime;
+    private bool _isRenderingSubscribed;
 
     public MainWindow()
     {
@@ -74,7 +76,6 @@ public partial class MainWindow : Window
             maximumDesignHeight: 1040);
         _settings = _profileStore.Load();
         SetSidebarCollapsed(_settings.SidebarCollapsed, false);
-        _smoothScrollTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(16), DispatcherPriority.Render, SmoothScrollTimer_Tick, Dispatcher);
         HomeRowsItemsControl.ItemsSource = _homeRows;
         Loaded += MainWindow_Loaded;
         RefreshProfiles();
@@ -1341,18 +1342,34 @@ public partial class MainWindow : Window
 
         // Preserve raw delta so high-resolution devices naturally move in smaller increments.
         // A 120-delta mouse notch targets ~82 DIPs; Shift-horizontal is slightly stronger.
-        var dipPerDelta = horizontal ? 0.86 : 0.68;
+        var dipPerDelta = horizontal ? 0.88 : 0.70;
         var delta = -wheelDelta * dipPerDelta;
         var baseOffset = state.Active && state.Horizontal == horizontal ? state.Target : current;
         state.Horizontal = horizontal;
         state.Target = Math.Clamp(baseOffset + delta, 0, maximum);
         state.Active = true;
 
-        if (!_smoothScrollTimer.IsEnabled) _smoothScrollTimer.Start();
+        if (!_isRenderingSubscribed)
+        {
+            _scrollStopwatch.Restart();
+            _lastRenderingTime = TimeSpan.Zero;
+            CompositionTarget.Rendering += OnCompositionTargetRendering;
+            _isRenderingSubscribed = true;
+        }
     }
 
-    private void SmoothScrollTimer_Tick(object? sender, EventArgs e)
+    private void OnCompositionTargetRendering(object? sender, EventArgs e)
     {
+        var elapsed = _scrollStopwatch.Elapsed;
+        var dt = (elapsed - _lastRenderingTime).TotalSeconds;
+        _lastRenderingTime = elapsed;
+
+        if (dt <= 0 || dt > 0.1) dt = 0.016;
+
+        // Rate-independent exponential decay: critically damped, smooth at 60/120/144Hz.
+        const double lambda = 19.0;
+        var factor = 1.0 - Math.Exp(-lambda * dt);
+
         var anyActive = false;
         foreach (var pair in _smoothScrollStates.ToArray())
         {
@@ -1372,15 +1389,18 @@ public partial class MainWindow : Window
                 continue;
             }
 
-            // Critically damped-feeling exponential approach: quick response at first,
-            // progressively softer near the target, with no overshoot.
-            var next = current + remaining * 0.24;
+            var next = current + remaining * factor;
             if (state.Horizontal) scroller.ScrollToHorizontalOffset(next);
             else scroller.ScrollToVerticalOffset(next);
             anyActive = true;
         }
 
-        if (!anyActive) _smoothScrollTimer.Stop();
+        if (!anyActive && _isRenderingSubscribed)
+        {
+            CompositionTarget.Rendering -= OnCompositionTargetRendering;
+            _isRenderingSubscribed = false;
+            _scrollStopwatch.Stop();
+        }
     }
 
     private void DynamicHomeRow_ScrollChanged(object sender, ScrollChangedEventArgs e)
@@ -2633,12 +2653,28 @@ public partial class MainWindow : Window
         MainPageContainer.Visibility = Visibility.Collapsed;
         DetailPage.Visibility = Visibility.Visible;
         HideBusy();
+
+        var opacityAnim = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(180))
+        {
+            EasingFunction = new QuarticEase { EasingMode = EasingMode.EaseOut }
+        };
+        var slideAnim = new DoubleAnimation(18, 0, TimeSpan.FromMilliseconds(180))
+        {
+            EasingFunction = new QuarticEase { EasingMode = EasingMode.EaseOut }
+        };
+        DetailPage.BeginAnimation(UIElement.OpacityProperty, opacityAnim);
+        DetailPageTranslate.BeginAnimation(TranslateTransform.YProperty, slideAnim);
     }
 
     private void HideDetailSheet()
     {
         DetailPage.Visibility = Visibility.Collapsed;
         MainPageContainer.Visibility = Visibility.Visible;
+        var opacityAnim = new DoubleAnimation(0.75, 1, TimeSpan.FromMilliseconds(150))
+        {
+            EasingFunction = new QuarticEase { EasingMode = EasingMode.EaseOut }
+        };
+        MainPageContainer.BeginAnimation(UIElement.OpacityProperty, opacityAnim);
         DetailBackdropImage.Source = null;
         DetailLogoImage.Source = null;
     }
@@ -2840,6 +2876,36 @@ public partial class MainWindow : Window
         HideBusy();
         oldImages?.Dispose();
         old?.Dispose();
+    }
+
+    private void WindowMinimize_Click(object sender, RoutedEventArgs e)
+    {
+        WindowState = WindowState.Minimized;
+    }
+
+    private void WindowMaximizeRestore_Click(object sender, RoutedEventArgs e)
+    {
+        WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+    }
+
+    private void WindowClose_Click(object sender, RoutedEventArgs e)
+    {
+        Close();
+    }
+
+    protected override void OnStateChanged(EventArgs e)
+    {
+        base.OnStateChanged(e);
+        if (WindowMaximizeIcon is not null)
+        {
+            WindowMaximizeIcon.Data = WindowState == WindowState.Maximized
+                ? Geometry.Parse("M 4,8 L 4,18 L 14,18 L 14,8 Z M 7,5 L 17,5 L 17,15 L 14,15 M 7,8 L 7,5")
+                : (Geometry)FindResource("GeoWindowMax");
+        }
+        if (WindowMaximizeButton is not null)
+        {
+            WindowMaximizeButton.ToolTip = WindowState == WindowState.Maximized ? "还原" : "最大化";
+        }
     }
 
     private void OpenDebugConsoleButton_Click(object sender, RoutedEventArgs e) => DebugConsoleWindow.ShowFor(this);
