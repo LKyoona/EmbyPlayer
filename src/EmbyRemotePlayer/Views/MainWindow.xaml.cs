@@ -73,6 +73,7 @@ public partial class MainWindow : Window
             maximumDesignWidth: 1720,
             maximumDesignHeight: 1040);
         _settings = _profileStore.Load();
+        SetSidebarCollapsed(_settings.SidebarCollapsed, false);
         _smoothScrollTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(16), DispatcherPriority.Render, SmoothScrollTimer_Tick, Dispatcher);
         HomeRowsItemsControl.ItemsSource = _homeRows;
         Loaded += MainWindow_Loaded;
@@ -2785,8 +2786,68 @@ public partial class MainWindow : Window
 
     private void OpenDebugConsoleButton_Click(object sender, RoutedEventArgs e) => DebugConsoleWindow.ShowFor(this);
 
+    private void SidebarToggleButton_Click(object sender, RoutedEventArgs e) => ToggleSidebar();
+
+    private void ToggleSidebar()
+    {
+        var next = !_settings.SidebarCollapsed;
+        SetSidebarCollapsed(next, true);
+        _settings.SidebarCollapsed = next;
+        _profileStore.Save(_settings);
+    }
+
+    private void SetSidebarCollapsed(bool collapsed, bool animate)
+    {
+        var targetWidth = collapsed ? 68.0 : 218.0;
+        if (animate)
+        {
+            var anim = new DoubleAnimation(targetWidth, TimeSpan.FromMilliseconds(200))
+            {
+                EasingFunction = new QuarticEase { EasingMode = EasingMode.EaseOut }
+            };
+            SidebarBorder.BeginAnimation(Border.WidthProperty, anim);
+        }
+        else
+        {
+            SidebarBorder.BeginAnimation(Border.WidthProperty, null);
+            SidebarBorder.Width = targetWidth;
+        }
+
+        SidebarBrandText.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
+        SidebarServerBox.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
+        AppVersionText.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
+        SidebarNavBrowseHeader.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
+        HomeNavText.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
+        LibrariesNavText.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
+        FavoritesNavText.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
+
+        HomeNavIcon.Margin = collapsed ? new Thickness(0) : new Thickness(0, 0, 12, 0);
+        LibrariesNavIcon.Margin = collapsed ? new Thickness(0) : new Thickness(0, 0, 12, 0);
+        FavoritesNavIcon.Margin = collapsed ? new Thickness(0) : new Thickness(0, 0, 12, 0);
+
+        HomeNavButton.Padding = collapsed ? new Thickness(0, 12, 0, 12) : new Thickness(15, 13, 15, 13);
+        LibrariesNavButton.Padding = collapsed ? new Thickness(0, 12, 0, 12) : new Thickness(15, 13, 15, 13);
+        FavoritesNavButton.Padding = collapsed ? new Thickness(0, 12, 0, 12) : new Thickness(15, 13, 15, 13);
+
+        SidebarBottomExpanded.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
+        SidebarBottomCollapsed.Visibility = collapsed ? Visibility.Visible : Visibility.Collapsed;
+        SidebarInnerGrid.Margin = collapsed ? new Thickness(6, 20, 6, 20) : new Thickness(14, 24, 14, 20);
+
+        SidebarToggleButton.ToolTip = collapsed ? "展开侧边栏 (Ctrl+B)" : "收起侧边栏 (Ctrl+B)";
+        SidebarToggleIcon.Data = collapsed
+            ? Geometry.Parse("M 3,4 L 21,4 C 21.55,4 22,4.45 22,5 L 22,19 C 22,19.55 21.55,20 21,20 L 3,20 C 2.45,20 2,19.55 2,19 L 2,5 C 2,4.45 2.45,4 3,4 Z M 16,6 L 20,6 L 20,18 L 16,18 Z")
+            : Geometry.Parse("M 3,4 L 21,4 C 21.55,4 22,4.45 22,5 L 22,19 C 22,19.55 21.55,20 21,20 L 3,20 C 2.45,20 2,19.55 2,19 L 2,5 C 2,4.45 2.45,4 3,4 Z M 8,6 L 4,6 L 4,18 L 8,18 Z");
+    }
+
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        if (e.Key == Key.B && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+        {
+            e.Handled = true;
+            ToggleSidebar();
+            return;
+        }
+
         var navigateBack = (Keyboard.Modifiers & ModifierKeys.Alt) != 0 &&
                            (e.Key == Key.Left || e.SystemKey == Key.Left);
         if (navigateBack)

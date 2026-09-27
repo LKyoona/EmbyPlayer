@@ -32,6 +32,7 @@ public sealed class AppSettings
     public bool HardwareDecoding { get; set; } = true;
     public bool RememberPlaybackSpeed { get; set; } = true;
     public double PlaybackSpeed { get; set; } = 1.0;
+    public bool SidebarCollapsed { get; set; } = false;
 }
 
 public enum BrowseKind
