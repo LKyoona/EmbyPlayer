@@ -62,7 +62,8 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        AppVersionText.Text = $"v{typeof(MainWindow).Assembly.GetName().Version?.ToString(3)}";
+        var appVer = typeof(MainWindow).Assembly.GetName().Version;
+        AppVersionText.Text = appVer is null ? "v0.0.0" : $"v{appVer.ToString(appVer.Revision > 0 ? 4 : 3)}";
         App.ConfigureAdaptiveWindow(
             this,
             widthRatio: 0.90,
