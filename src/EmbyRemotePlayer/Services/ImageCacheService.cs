@@ -169,6 +169,77 @@ public sealed class ImageCacheService : IDisposable
         return GetAsyncCore(itemId, imageType, tag, tag, requestedWidth, cancellationToken, priority);
     }
 
+    public async Task<BitmapSource?> GetUserAvatarAsync(
+        string userId,
+        string? tag,
+        int maxWidth = 128,
+        CancellationToken cancellationToken = default)
+    {
+        if (_disposed) throw new ObjectDisposedException(nameof(ImageCacheService));
+        if (string.IsNullOrWhiteSpace(userId)) return null;
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var normWidth = NormalizeWidth(maxWidth);
+        var key = $"user-avatar:{userId}:{tag ?? "none"}:{normWidth}";
+        if (TryGetMemory(key, out var cached)) return cached;
+
+        var path = GetCachePath(key);
+        byte[]? bytes = null;
+
+        if (File.Exists(path))
+        {
+            try
+            {
+                bytes = await File.ReadAllBytesAsync(path, cancellationToken).ConfigureAwait(false);
+                if (bytes.Length == 0 || bytes.Length > MaxImageBytes) bytes = null;
+                else TouchCacheFile(path);
+            }
+            catch (OperationCanceledException) { throw; }
+            catch
+            {
+                bytes = null;
+                TryDelete(path);
+            }
+        }
+
+        if (bytes is null)
+        {
+            try
+            {
+                bytes = await _api.DownloadUserImageAsync(userId, tag, normWidth, cancellationToken).ConfigureAwait(false);
+                if (bytes is { Length: > 0 } && bytes.Length <= MaxImageBytes)
+                {
+                    await WriteCacheFileAsync(path, bytes, cancellationToken).ConfigureAwait(false);
+                }
+                else
+                {
+                    bytes = null;
+                }
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                LogService.Warning($"Failed to retrieve user avatar for {userId}.", ex);
+                PutMemory(key, null, DateTimeOffset.UtcNow + TimeSpan.FromMinutes(10));
+                return null;
+            }
+        }
+
+        if (bytes is null || bytes.Length == 0) return null;
+
+        await _decodeThrottle.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var bitmap = Decode(bytes, normWidth);
+            if (bitmap is not null) PutMemory(key, bitmap);
+            return bitmap;
+        }
+        finally
+        {
+            _decodeThrottle.Release();
+        }
+    }
+
     private async Task<BitmapSource?> GetAsyncCore(
         string itemId,
         string imageType,

@@ -158,6 +158,8 @@ public partial class MainWindow : Window
             }
 
             profile.UserName = user?.Name ?? profile.UserName;
+            if (!string.IsNullOrWhiteSpace(user?.PrimaryImageTag))
+                profile.UserPrimaryImageTag = user.PrimaryImageTag;
             profile.LastConnectedAt = DateTimeOffset.Now;
             _profileStore.Save(_settings);
             await EnterApplicationAsync(profile);
@@ -264,6 +266,8 @@ public partial class MainWindow : Window
             profile.ServerId = auth.ServerId ?? auth.User?.ServerId ?? info?.Id ?? string.Empty;
             profile.UserId = auth.User!.Id!;
             profile.UserName = auth.User.Name ?? profile.UserName;
+            if (!string.IsNullOrWhiteSpace(auth.User.PrimaryImageTag))
+                profile.UserPrimaryImageTag = auth.User.PrimaryImageTag;
             profile.ServerVersion = info?.Version;
             profile.LastConnectedAt = DateTimeOffset.Now;
             if (string.IsNullOrWhiteSpace(profile.DisplayName)) profile.DisplayName = info?.ServerName ?? profile.UserName + " 的 Emby";
@@ -303,6 +307,8 @@ public partial class MainWindow : Window
         _settings.LastProfileId = profile.ProfileId;
         _profileStore.Save(_settings);
         CurrentServerText.Text = $"{profile.FriendlyName}\n{profile.UserName}";
+        UpdateUserAvatar(profile, _api?.CurrentUser);
+        _ = LoadUserAvatarAsync(profile, _api?.CurrentUser, CurrentToken);
         ServerPanel.Visibility = Visibility.Collapsed;
         LoginPanel.Visibility = Visibility.Collapsed;
         AppPanel.Visibility = Visibility.Visible;
@@ -311,6 +317,55 @@ public partial class MainWindow : Window
         // request when no cache exists, while repeat visits are served directly from cache.
         _api?.PrefetchHome();
         await LoadHomeAsync();
+    }
+
+    private void UpdateUserAvatar(ServerProfile profile, EmbyUser? user)
+    {
+        var name = !string.IsNullOrWhiteSpace(user?.Name)
+            ? user.Name
+            : (!string.IsNullOrWhiteSpace(profile.UserName) ? profile.UserName : "用户");
+        var initial = string.IsNullOrWhiteSpace(name) ? "U" : name.Trim()[..1].ToUpperInvariant();
+
+        UserAvatarInitialsText.Text = initial;
+        SidebarUserNameText.Text = name;
+        SidebarServerBadgeText.Text = string.IsNullOrWhiteSpace(profile.FriendlyName) ? "已连接空间" : profile.FriendlyName;
+        UserAvatarInitialsCircle.ToolTip = $"{name} ({profile.FriendlyName})";
+    }
+
+    private async Task LoadUserAvatarAsync(ServerProfile profile, EmbyUser? user, CancellationToken token)
+    {
+        if (_images is null || string.IsNullOrWhiteSpace(profile.UserId)) return;
+        var tag = user?.PrimaryImageTag ?? profile.UserPrimaryImageTag;
+
+        try
+        {
+            var avatar = await _images.GetUserAvatarAsync(profile.UserId, tag, 128, token).ConfigureAwait(false);
+            if (token.IsCancellationRequested) return;
+
+            await Dispatcher.InvokeAsync(() =>
+            {
+                if (avatar is not null)
+                {
+                    UserAvatarImage.Source = avatar;
+                    UserAvatarImage.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    UserAvatarImage.Source = null;
+                    UserAvatarImage.Visibility = Visibility.Collapsed;
+                }
+            }, DispatcherPriority.Background, token);
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            LogService.Warning($"Unable to load user avatar for {profile.UserId}.", ex);
+            await Dispatcher.InvokeAsync(() =>
+            {
+                UserAvatarImage.Source = null;
+                UserAvatarImage.Visibility = Visibility.Collapsed;
+            }, DispatcherPriority.Background, token);
+        }
     }
 
     private async void HomeButton_Click(object sender, RoutedEventArgs e)
@@ -2629,6 +2684,9 @@ public partial class MainWindow : Window
         if (MessageBox.Show("退出当前账号并清除本机保存的访问令牌？", "退出账号", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
         CloseActivePlayer();
         try { if (_api is not null) await _api.LogoutAsync(); } catch { }
+        UserAvatarImage.Source = null;
+        UserAvatarImage.Visibility = Visibility.Collapsed;
+        UserAvatarInitialsText.Text = "U";
         _profileStore.ClearToken(_activeProfile);
         ReplaceApi(null);
         PrepareProfileLogin(_activeProfile, "已退出，请重新登录。");
@@ -2833,10 +2891,20 @@ public partial class MainWindow : Window
         SidebarBottomCollapsed.Visibility = collapsed ? Visibility.Visible : Visibility.Collapsed;
         SidebarInnerGrid.Margin = collapsed ? new Thickness(6, 20, 6, 20) : new Thickness(14, 24, 14, 20);
 
+        SidebarToggleButton.Visibility = collapsed ? Visibility.Collapsed : Visibility.Visible;
+        SidebarMiniExpandButton.Visibility = collapsed ? Visibility.Visible : Visibility.Collapsed;
+        UserAvatarButton.HorizontalAlignment = collapsed ? HorizontalAlignment.Center : HorizontalAlignment.Left;
+
         SidebarToggleButton.ToolTip = collapsed ? "展开侧边栏 (Ctrl+B)" : "收起侧边栏 (Ctrl+B)";
         SidebarToggleIcon.Data = collapsed
             ? Geometry.Parse("M 3,4 L 21,4 C 21.55,4 22,4.45 22,5 L 22,19 C 22,19.55 21.55,20 21,20 L 3,20 C 2.45,20 2,19.55 2,19 L 2,5 C 2,4.45 2.45,4 3,4 Z M 16,6 L 20,6 L 20,18 L 16,18 Z")
             : Geometry.Parse("M 3,4 L 21,4 C 21.55,4 22,4.45 22,5 L 22,19 C 22,19.55 21.55,20 21,20 L 3,20 C 2.45,20 2,19.55 2,19 L 2,5 C 2,4.45 2.45,4 3,4 Z M 8,6 L 4,6 L 4,18 L 8,18 Z");
+    }
+
+    private void UserAvatarButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_settings.SidebarCollapsed)
+            ToggleSidebar();
     }
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)

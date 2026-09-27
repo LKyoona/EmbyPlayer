@@ -413,28 +413,44 @@
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
                         
-                        <!-- Header / Brand & Toggle -->
+                        <!-- Header / Brand & User Avatar & Toggle -->
                         <StackPanel>
-                            <Grid Height="40">
+                            <Grid x:Name="SidebarHeaderGrid" Height="44">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Border Width="36" Height="36" CornerRadius="10" Background="{StaticResource AccentBrush}" VerticalAlignment="Center" Effect="{StaticResource AccentGlow}">
-                                        <TextBlock Text="E" Foreground="White" FontSize="18" FontWeight="Black" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                    <StackPanel Margin="10,0,0,0" VerticalAlignment="Center" x:Name="SidebarBrandText">
-                                        <TextBlock Text="Emby Player" Foreground="White" FontSize="16.5" FontWeight="Bold"/>
-                                        <TextBlock Text="REMOTE CINEMA" Foreground="#FF77777E" FontSize="8.5" FontWeight="SemiBold" Margin="0,1,0,0"/>
+                                <Button x:Name="UserAvatarButton" Style="{StaticResource TextButton}" Padding="0" Click="UserAvatarButton_Click" HorizontalAlignment="Left" ToolTip="用户个人空间">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <!-- User Avatar (Circle container) -->
+                                        <Grid Width="38" Height="38">
+                                            <!-- Fallback Initials Circle -->
+                                            <Border x:Name="UserAvatarInitialsCircle" Width="38" Height="38" CornerRadius="19" Background="{StaticResource AccentBrush}" VerticalAlignment="Center" Effect="{StaticResource AccentGlow}">
+                                                <TextBlock x:Name="UserAvatarInitialsText" Text="U" Foreground="White" FontSize="16" FontWeight="Black" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+                                            <!-- Real Avatar Image -->
+                                            <Border Width="38" Height="38" CornerRadius="19" ClipToBounds="True">
+                                                <Image x:Name="UserAvatarImage" Stretch="UniformToFill" Visibility="Collapsed"/>
+                                            </Border>
+                                            <!-- Subtle outline -->
+                                            <Border Width="38" Height="38" CornerRadius="19" BorderBrush="#35FFFFFF" BorderThickness="1" IsHitTestVisible="False"/>
+                                        </Grid>
+                                        <StackPanel Margin="10,0,0,0" VerticalAlignment="Center" x:Name="SidebarBrandText">
+                                            <TextBlock x:Name="SidebarUserNameText" Text="Emby 用户" Foreground="White" FontSize="15" FontWeight="Bold" TextTrimming="CharacterEllipsis" MaxWidth="110"/>
+                                            <TextBlock x:Name="SidebarServerBadgeText" Text="REMOTE CINEMA" Foreground="#FF888890" FontSize="9.5" FontWeight="SemiBold" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" MaxWidth="110"/>
+                                        </StackPanel>
                                     </StackPanel>
-                                </StackPanel>
+                                </Button>
                                 <Button x:Name="SidebarToggleButton" Grid.Column="1" Style="{StaticResource TextButton}" Width="32" Height="32" Padding="0" VerticalAlignment="Center" HorizontalAlignment="Right" Click="SidebarToggleButton_Click" ToolTip="收起侧边栏 (Ctrl+B)">
                                     <Path x:Name="SidebarToggleIcon" Fill="#88FFFFFF" Stretch="Uniform" Width="14" Height="14"
                                           Data="M 3,4 L 21,4 C 21.55,4 22,4.45 22,5 L 22,19 C 22,19.55 21.55,20 21,20 L 3,20 C 2.45,20 2,19.55 2,19 L 2,5 C 2,4.45 2.45,4 3,4 Z M 8,6 L 4,6 L 4,18 L 8,18 Z"/>
                                 </Button>
                             </Grid>
-                            <Border x:Name="SidebarServerBox" Background="#1E0A84FF" BorderBrush="#450A84FF" BorderThickness="1" CornerRadius="10" Padding="10,8" Margin="0,16,0,0">
+                            <!-- Mini Toggle button visible only when collapsed -->
+                            <Button x:Name="SidebarMiniExpandButton" Style="{StaticResource TextButton}" Width="36" Height="30" Padding="0" Margin="0,8,0,0" Click="SidebarToggleButton_Click" Visibility="Collapsed" HorizontalAlignment="Center" ToolTip="展开侧边栏 (Ctrl+B)">
+                                <Path Fill="#88FFFFFF" Stretch="Uniform" Width="14" Height="14" Data="M 3,4 L 21,4 C 21.55,4 22,4.45 22,5 L 22,19 C 22,19.55 21.55,20 21,20 L 3,20 C 2.45,20 2,19.55 2,19 L 2,5 C 2,4.45 2.45,4 3,4 Z M 16,6 L 20,6 L 20,18 L 16,18 Z"/>
+                            </Button>
+                            <Border x:Name="SidebarServerBox" Background="#1E0A84FF" BorderBrush="#450A84FF" BorderThickness="1" CornerRadius="10" Padding="10,8" Margin="0,14,0,0">
                                 <StackPanel>
                                     <TextBlock Text="●  当前媒体空间" Foreground="{StaticResource AccentBrush}" FontSize="10" FontWeight="SemiBold"/>
                                     <TextBlock x:Name="CurrentServerText" Foreground="#FFD0D0D3" FontSize="12" Margin="0,5,0,0" TextTrimming="CharacterEllipsis"/>

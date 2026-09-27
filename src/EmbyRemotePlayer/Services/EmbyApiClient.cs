@@ -780,6 +780,30 @@ public sealed class EmbyApiClient : IDisposable
         throw new EmbyApiException("服务器没有返回可用的图片数据。");
     }
 
+    public async Task<byte[]> DownloadUserImageAsync(string userId, string? tag, int maxWidth, CancellationToken cancellationToken = default)
+    {
+        EnsureAuthenticated();
+        var baseEndpoint = $"Users/{EscapePath(userId)}/Images/Primary";
+        var query = new Dictionary<string, string?>
+        {
+            ["maxWidth"] = maxWidth.ToString(),
+            ["quality"] = "85",
+            ["api_key"] = AccessToken
+        };
+        if (!string.IsNullOrWhiteSpace(tag))
+        {
+            query["tag"] = tag;
+        }
+
+        var endpoint = AddQuery(baseEndpoint, query);
+        using var request = CreateRequest(HttpMethod.Get, endpoint, true);
+        request.Headers.Accept.Clear();
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("image/*"));
+        using var response = await SendAsync(request, false, cancellationToken).ConfigureAwait(false);
+        await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
+        return await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     public Task ReportPlaybackStartedAsync(PlaybackReport report, CancellationToken cancellationToken = default) =>
         PostPlaybackReportAsync("Sessions/Playing", report, cancellationToken);
 

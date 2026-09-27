@@ -12,6 +12,7 @@ public sealed class ServerProfile
     public bool AutoConnect { get; set; }
     public DateTimeOffset? LastConnectedAt { get; set; }
     public string? ServerVersion { get; set; }
+    public string? UserPrimaryImageTag { get; set; }
 
     [JsonIgnore]
     public string CredentialTarget => $"EmbyRemotePlayer:v2:{ProfileId}";
