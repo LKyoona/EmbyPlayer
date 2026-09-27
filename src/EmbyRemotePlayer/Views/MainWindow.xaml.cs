@@ -35,9 +35,15 @@ public partial class MainWindow : Window
 
     // Viewport-driven image state. We never enqueue an entire 100+ item page anymore.
     private CancellationTokenSource? _viewportImageCts;
-    private List<MediaCardViewModel> _continueCards = [];
-    private List<MediaCardViewModel> _latestMovieCards = [];
-    private List<MediaCardViewModel> _latestEpisodeCards = [];
+    private readonly ObservableCollection<HomeRowViewModel> _homeRows = [];
+    private readonly Dictionary<string, HomeRowViewModel> _homeRowsByKey = new(StringComparer.Ordinal);
+    private readonly Dictionary<ScrollViewer, HomeRowViewModel> _homeRowViewports = new();
+    private readonly List<EmbyItem> _heroCandidates = [];
+    private int _heroIndex;
+    private DispatcherTimer? _heroTimer;
+    private CancellationTokenSource? _heroCts;
+    private bool _heroUsingFrontImage;
+    private EmbyItem? _currentHeroItem;
     private List<MediaCardViewModel> _browseCards = [];
     private readonly ObservableCollection<MediaCardViewModel> _browseVisibleCards = [];
     private List<SearchCardSection> _searchSections = [];
@@ -45,9 +51,9 @@ public partial class MainWindow : Window
 
     private const int BrowseInitialRenderCount = 36;
     private const int BrowseRenderBatchSize = 24;
-    private const double PosterCellWidth = 182;
+    private const double PosterCellWidth = 208;
     private const double PosterCellHeight = 284;
-    private const double LandscapeCellWidth = 322;
+    private const double LandscapeCellWidth = 398;
     private const double LandscapeCellHeight = 195;
 
     private readonly Dictionary<ScrollViewer, SmoothScrollState> _smoothScrollStates = new();
@@ -67,6 +73,7 @@ public partial class MainWindow : Window
             maximumDesignHeight: 1040);
         _settings = _profileStore.Load();
         _smoothScrollTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(16), DispatcherPriority.Render, SmoothScrollTimer_Tick, Dispatcher);
+        HomeRowsItemsControl.ItemsSource = _homeRows;
         Loaded += MainWindow_Loaded;
         RefreshProfiles();
     }
@@ -307,12 +314,20 @@ public partial class MainWindow : Window
     private async void HomeButton_Click(object sender, RoutedEventArgs e)
     {
         HideDetailSheet();
+        SetActiveNavigation(HomeNavButton);
         await LoadHomeAsync();
+    }
+
+    private void SetActiveNavigation(Button? active)
+    {
+        foreach (var button in new[] { HomeNavButton, LibrariesNavButton, FavoritesNavButton })
+            button.Tag = ReferenceEquals(button, active) ? "Active" : null;
     }
 
     private async Task LoadHomeAsync()
     {
         if (_api is null) return;
+        SetActiveNavigation(HomeNavButton);
         var token = BeginOperation();
         BeginViewportImageSession();
         HeaderTitleText.Text = "首页";
@@ -325,9 +340,13 @@ public partial class MainWindow : Window
         // micro/milliseconds when warm, disk cache on restart, or share one in-flight HTTP task.
         var tasks = new List<Task>
         {
+            LoadNextUpHomeSectionAsync(token),
             LoadResumeHomeSectionAsync(token),
+            LoadSuggestionsHomeSectionAsync(token),
             LoadLatestMoviesHomeSectionAsync(token),
-            LoadLatestEpisodesHomeSectionAsync(token)
+            LoadLatestEpisodesHomeSectionAsync(token),
+            LoadTopRatedHomeSectionAsync(token),
+            LoadGenreHomeSectionsAsync(token)
         };
 
         ShowBusy("正在加载首页…");
@@ -358,25 +377,54 @@ public partial class MainWindow : Window
         finally { HideBusy(); }
     }
 
+    private async Task LoadNextUpHomeSectionAsync(CancellationToken token)
+    {
+        if (_api is null) return;
+        try
+        {
+            var items = await _api.GetNextUpAsync(limit: EmbyApiClient.DefaultHomeRowLimit, cancellationToken: token);
+            UpsertHomeRow("nextup", rank: 10, "接着看", "追更剧集下一集", "下一集", isLandscape: true, items);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (EmbyApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized) { throw; }
+        catch (Exception ex)
+        {
+            LogService.Warning("Next-up section failed to load.", ex);
+            RemoveHomeRow("nextup");
+        }
+    }
+
     private async Task LoadResumeHomeSectionAsync(CancellationToken token)
     {
         if (_api is null) return;
         try
         {
             var items = await _api.GetResumeItemsAsync(token);
-            _continueCards = CreateCards(items);
-            ContinueItemsControl.ItemsSource = _continueCards;
-            ContinueEmptyText.Text = "没有未看完的内容";
-            ContinueEmptyText.Visibility = _continueCards.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-            ScheduleHorizontalViewport(_continueCards, preferBackdrop: true, ContinueScroll, LandscapeCellWidth);
+            UpsertHomeRow("resume", rank: 20, "继续观看", "从上次离开的地方接着看", "继续播放", isLandscape: true, items);
         }
         catch (OperationCanceledException) { throw; }
         catch (EmbyApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized) { throw; }
         catch (Exception ex)
         {
             LogService.Warning("Continue-watching section failed to load.", ex);
-            ContinueEmptyText.Text = "继续观看暂时加载失败";
-            ContinueEmptyText.Visibility = Visibility.Visible;
+            RemoveHomeRow("resume");
+        }
+    }
+
+    private async Task LoadSuggestionsHomeSectionAsync(CancellationToken token)
+    {
+        if (_api is null) return;
+        try
+        {
+            var items = await _api.GetSuggestionsAsync(limit: 16, cancellationToken: token);
+            UpsertHomeRow("suggestions", rank: 30, "为你推荐", "根据观影品味智能精选", "推荐", isLandscape: false, items);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (EmbyApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized) { throw; }
+        catch (Exception ex)
+        {
+            LogService.Warning("Suggestions section failed to load.", ex);
+            RemoveHomeRow("suggestions");
         }
     }
 
@@ -385,16 +433,15 @@ public partial class MainWindow : Window
         if (_api is null) return;
         try
         {
-            var items = await _api.GetLatestAsync("Movie", limit: 24, cancellationToken: token);
-            _latestMovieCards = CreateCards(items);
-            LatestMoviesItemsControl.ItemsSource = _latestMovieCards;
-            ScheduleHorizontalViewport(_latestMovieCards, preferBackdrop: false, LatestMoviesScroll, PosterCellWidth);
+            var items = await _api.GetLatestAsync("Movie", limit: EmbyApiClient.DefaultHomeRowLimit, cancellationToken: token);
+            UpsertHomeRow("latest-movies", rank: 40, "最新电影", "刚刚加入你的电影库", "电影", isLandscape: false, items);
         }
         catch (OperationCanceledException) { throw; }
         catch (EmbyApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized) { throw; }
         catch (Exception ex)
         {
             LogService.Warning("Latest-movies section failed to load.", ex);
+            RemoveHomeRow("latest-movies");
         }
     }
 
@@ -403,30 +450,359 @@ public partial class MainWindow : Window
         if (_api is null) return;
         try
         {
-            var items = await _api.GetLatestAsync("Episode", limit: 24, cancellationToken: token);
-            _latestEpisodeCards = CreateCards(items);
-            LatestEpisodesItemsControl.ItemsSource = _latestEpisodeCards;
-            ScheduleHorizontalViewport(_latestEpisodeCards, preferBackdrop: false, LatestEpisodesScroll, PosterCellWidth);
+            var items = await _api.GetLatestAsync("Episode", limit: EmbyApiClient.DefaultHomeRowLimit, cancellationToken: token);
+            UpsertHomeRow("latest-episodes", rank: 50, "最新剧集", "追更内容与新上线单集", "剧集", isLandscape: true, items);
         }
         catch (OperationCanceledException) { throw; }
         catch (EmbyApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized) { throw; }
         catch (Exception ex)
         {
             LogService.Warning("Latest-episodes section failed to load.", ex);
+            RemoveHomeRow("latest-episodes");
         }
+    }
+
+    private async Task LoadTopRatedHomeSectionAsync(CancellationToken token)
+    {
+        if (_api is null) return;
+        try
+        {
+            var items = await _api.GetTopRatedAsync(limit: 20, cancellationToken: token);
+            UpsertHomeRow("top-rated", rank: 60, "高分佳作", "社区评分 7.0 以上口碑佳作", "高分", isLandscape: false, items);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (EmbyApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized) { throw; }
+        catch (Exception ex)
+        {
+            LogService.Warning("Top-rated section failed to load.", ex);
+            RemoveHomeRow("top-rated");
+        }
+    }
+
+    private async Task LoadGenreHomeSectionsAsync(CancellationToken token)
+    {
+        if (_api is null) return;
+        try
+        {
+            var genres = await _api.GetGenresAsync(token);
+            if (genres.Count == 0) return;
+
+            var selectedGenres = genres
+                .Where(g => !string.IsNullOrWhiteSpace(g.Name))
+                .Take(3)
+                .ToList();
+
+            var throttler = new SemaphoreSlim(2, 2);
+            var genreTasks = selectedGenres.Select(async (genre, index) =>
+            {
+                await throttler.WaitAsync(token);
+                try
+                {
+                    var items = await _api.GetItemsByGenreAsync(genre.Name!, limit: 20, cancellationToken: token);
+                    var key = $"genre-{genre.Name}";
+                    UpsertHomeRow(key, rank: 70 + index, $"{genre.Name}精选", "高口碑类型佳作", genre.Name!, isLandscape: false, items);
+                }
+                catch (OperationCanceledException) { }
+                catch (Exception ex)
+                {
+                    LogService.Warning($"Genre row failed to load for {genre.Name}.", ex);
+                    RemoveHomeRow($"genre-{genre.Name}");
+                }
+                finally
+                {
+                    throttler.Release();
+                }
+            });
+
+            await Task.WhenAll(genreTasks);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (EmbyApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized) { throw; }
+        catch (Exception ex)
+        {
+            LogService.Warning("Genre sections discovery failed to load.", ex);
+        }
+    }
+
+    private void UpsertHomeRow(string key, int rank, string title, string subtitle, string badgeText, bool isLandscape, IReadOnlyList<EmbyItem> items)
+    {
+        if (items.Count == 0)
+        {
+            RemoveHomeRow(key);
+            return;
+        }
+
+        var cards = CreateCards(items);
+        if (_homeRowsByKey.TryGetValue(key, out var existing))
+        {
+            existing.Cards.Clear();
+            foreach (var card in cards) existing.Cards.Add(card);
+            ScheduleHorizontalViewportForRegisteredRow(existing);
+            UpdateHomeEmptyState();
+            return;
+        }
+
+        var row = new HomeRowViewModel(key, rank, title, subtitle, badgeText, isLandscape);
+        foreach (var card in cards) row.Cards.Add(card);
+        _homeRowsByKey[key] = row;
+
+        // Insert maintaining deterministic Rank order
+        var insertIndex = 0;
+        while (insertIndex < _homeRows.Count && _homeRows[insertIndex].Rank <= rank)
+            insertIndex++;
+        _homeRows.Insert(insertIndex, row);
+        UpdateHomeEmptyState();
+        UpdateHeroCandidates();
+    }
+
+    private void RemoveHomeRow(string key)
+    {
+        if (_homeRowsByKey.Remove(key, out var oldRow))
+        {
+            _homeRows.Remove(oldRow);
+            CleanStaleHomeRowViewports();
+            UpdateHomeEmptyState();
+            UpdateHeroCandidates();
+        }
+    }
+
+    private void UpdateHomeEmptyState()
+    {
+        HomeEmptyStateText.Visibility = _homeRows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void UpdateHeroCandidates()
+    {
+        var candidates = new List<EmbyItem>();
+        var seenIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        void AddFromRow(string rowKey, int take = 2)
+        {
+            if (!_homeRowsByKey.TryGetValue(rowKey, out var row)) return;
+            foreach (var card in row.Cards.Take(take))
+            {
+                if (card.Item.CanPlay && seenIds.Add(card.Item.Id))
+                    candidates.Add(card.Item);
+            }
+        }
+
+        AddFromRow("nextup", 1);
+        AddFromRow("resume", 1);
+        AddFromRow("suggestions", 2);
+        AddFromRow("top-rated", 2);
+        AddFromRow("latest-movies", 2);
+
+        var finalCandidates = candidates.Take(5).ToList();
+        if (finalCandidates.Count == 0)
+        {
+            StopHeroRotation();
+            HeroPanel.Visibility = Visibility.Collapsed;
+            _heroCandidates.Clear();
+            _currentHeroItem = null;
+            return;
+        }
+
+        var changed = _heroCandidates.Count != finalCandidates.Count ||
+                      !_heroCandidates.Select(c => c.Id).SequenceEqual(finalCandidates.Select(c => c.Id));
+
+        if (changed)
+        {
+            _heroCandidates.Clear();
+            _heroCandidates.AddRange(finalCandidates);
+            _ = ShowHeroSlideAsync(0);
+            StartHeroRotation();
+        }
+    }
+
+    private async Task ShowHeroSlideAsync(int index)
+    {
+        if (_heroCandidates.Count == 0)
+        {
+            HeroPanel.Visibility = Visibility.Collapsed;
+            _currentHeroItem = null;
+            return;
+        }
+
+        _heroIndex = (index % _heroCandidates.Count + _heroCandidates.Count) % _heroCandidates.Count;
+        var item = _heroCandidates[_heroIndex];
+        _currentHeroItem = item;
+
+        try { _heroCts?.Cancel(); } catch { }
+        _heroCts?.Dispose();
+        _heroCts = new CancellationTokenSource();
+        var token = _heroCts.Token;
+
+        HeroPanel.Visibility = Visibility.Visible;
+        HeroTitleText.Text = item.DisplayName;
+
+        var badge = item.UserData?.PlaybackPositionTicks > 0 ? "继续观看"
+            : string.Equals(item.Type, "Episode", StringComparison.OrdinalIgnoreCase) ? "追更单集"
+            : (item.CommunityRating is >= 7.0 ? "高分口碑" : "精选推荐");
+        HeroBadgeText.Text = badge;
+
+        var metaParts = new List<string>();
+        if (item.ProductionYear is > 0) metaParts.Add(item.ProductionYear.Value.ToString());
+        if (item.CommunityRating is > 0) metaParts.Add($"★ {item.CommunityRating:0.0}");
+        if (item.Genres is { Count: > 0 }) metaParts.Add(string.Join(" / ", item.Genres.Take(2)));
+        if (item.RunTimeTicks is > 0) metaParts.Add(FormatDuration(TimeSpan.FromTicks(item.RunTimeTicks.Value)));
+        HeroMetaText.Text = string.Join("   ·   ", metaParts);
+
+        var overview = item.Overview;
+        HeroOverviewText.Text = string.IsNullOrWhiteSpace(overview) ? "精彩内容，即刻开播。" : overview;
+
+        RenderHeroDots();
+
+        var images = _images;
+        if (images is null) return;
+
+        try
+        {
+            var backdropTask = images.GetBackdropAsync(item, 1600, token, ImageRequestPriority.Immediate);
+            var logoTask = string.IsNullOrWhiteSpace(item.EffectiveLogoTag)
+                ? Task.FromResult<BitmapSource?>(null)
+                : images.GetAsync(item.EffectiveLogoItemId, "Logo", item.EffectiveLogoTag, 512, token, ImageRequestPriority.Immediate);
+
+            var (backdrop, logo) = (await backdropTask.ConfigureAwait(false), await logoTask.ConfigureAwait(false));
+            if (token.IsCancellationRequested) return;
+
+            await Dispatcher.InvokeAsync(() =>
+            {
+                if (token.IsCancellationRequested) return;
+
+                if (logo is not null)
+                {
+                    HeroLogoImage.Source = logo;
+                    HeroLogoImage.Visibility = Visibility.Visible;
+                    HeroTitleText.Visibility = Visibility.Collapsed;
+                }
+                else
+                {
+                    HeroLogoImage.Source = null;
+                    HeroLogoImage.Visibility = Visibility.Collapsed;
+                    HeroTitleText.Visibility = Visibility.Visible;
+                }
+
+                if (backdrop is not null)
+                {
+                    var incoming = _heroUsingFrontImage ? HeroBackdropImageB : HeroBackdropImageA;
+                    var outgoing = _heroUsingFrontImage ? HeroBackdropImageA : HeroBackdropImageB;
+                    _heroUsingFrontImage = !_heroUsingFrontImage;
+
+                    incoming.Source = backdrop;
+                    var fadeDuration = TimeSpan.FromMilliseconds(450);
+                    var ease = new System.Windows.Media.Animation.QuadraticEase { EasingMode = System.Windows.Media.Animation.EasingMode.EaseInOut };
+
+                    var fadeIn = new System.Windows.Media.Animation.DoubleAnimation(0, 1, fadeDuration) { EasingFunction = ease };
+                    var fadeOut = new System.Windows.Media.Animation.DoubleAnimation(1, 0, fadeDuration) { EasingFunction = ease };
+
+                    incoming.BeginAnimation(UIElement.OpacityProperty, fadeIn);
+                    outgoing.BeginAnimation(UIElement.OpacityProperty, fadeOut);
+                }
+            }, DispatcherPriority.Background, token);
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            LogService.Warning($"Hero billboard artwork failed for {item.Id}.", ex);
+        }
+    }
+
+    private void RenderHeroDots()
+    {
+        HeroIndicatorsPanel.Children.Clear();
+        if (_heroCandidates.Count <= 1) return;
+
+        for (var i = 0; i < _heroCandidates.Count; i++)
+        {
+            var dotIndex = i;
+            var isActive = i == _heroIndex;
+            var dot = new Border
+            {
+                Width = isActive ? 24 : 8,
+                Height = 8,
+                CornerRadius = new CornerRadius(4),
+                Background = isActive ? (Brush)FindResource("AccentBrush") : new SolidColorBrush(Color.FromArgb(100, 255, 255, 255)),
+                Margin = new Thickness(4, 0, 4, 0),
+                Cursor = Cursors.Hand
+            };
+            dot.MouseLeftButtonUp += (_, _) =>
+            {
+                _ = ShowHeroSlideAsync(dotIndex);
+                RestartHeroRotationTimer();
+            };
+            HeroIndicatorsPanel.Children.Add(dot);
+        }
+    }
+
+    private void StartHeroRotation()
+    {
+        if (_heroTimer is null)
+        {
+            _heroTimer = new DispatcherTimer(TimeSpan.FromSeconds(8), DispatcherPriority.Background, (_, _) =>
+            {
+                if (HomeScroll.Visibility == Visibility.Visible && DetailPage.Visibility != Visibility.Visible && _heroCandidates.Count > 1)
+                {
+                    _ = ShowHeroSlideAsync(_heroIndex + 1);
+                }
+            }, Dispatcher);
+        }
+        _heroTimer.Start();
+    }
+
+    private void RestartHeroRotationTimer()
+    {
+        _heroTimer?.Stop();
+        _heroTimer?.Start();
+    }
+
+    private void StopHeroRotation() => _heroTimer?.Stop();
+
+    private async void HeroPlayButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_currentHeroItem is null || _api is null) return;
+        ShowBusy("正在准备播放…");
+        try
+        {
+            await StartPlaybackAsync(_currentHeroItem, null, CurrentToken);
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            ShowMainError("播放失败", ex);
+        }
+        finally
+        {
+            HideBusy();
+        }
+    }
+
+    private async void HeroDetailsButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_currentHeroItem is null) return;
+        await ShowDetailsAsync(_currentHeroItem);
+    }
+
+    private void CleanStaleHomeRowViewports()
+    {
+        var stale = _homeRowViewports.Where(pair => !_homeRowsByKey.ContainsKey(pair.Value.Key)).Select(p => p.Key).ToList();
+        foreach (var scroller in stale) _homeRowViewports.Remove(scroller);
     }
 
     private async Task RefreshResumeSectionAsync()
     {
         if (_api is null || DetailPage.Visibility == Visibility.Visible || _currentNavigation?.Kind != BrowseKind.Home || HomeScroll.Visibility != Visibility.Visible) return;
         var token = BeginOperation();
-        try { await LoadResumeHomeSectionAsync(token); }
+        try
+        {
+            await Task.WhenAll(LoadResumeHomeSectionAsync(token), LoadNextUpHomeSectionAsync(token));
+        }
         catch (OperationCanceledException) { }
     }
 
     private async void LibrariesButton_Click(object sender, RoutedEventArgs e)
     {
         HideDetailSheet();
+        SetActiveNavigation(LibrariesNavButton);
         if (_api is null) return;
         var token = BeginOperation();
         ShowBusy("正在加载媒体库…");
@@ -444,6 +820,7 @@ public partial class MainWindow : Window
     private async void FavoritesButton_Click(object sender, RoutedEventArgs e)
     {
         HideDetailSheet();
+        SetActiveNavigation(FavoritesNavButton);
         if (_api is null) return;
         var token = BeginOperation();
         ShowBusy("正在加载收藏…");
@@ -467,9 +844,18 @@ public partial class MainWindow : Window
         await SearchAsync();
     }
 
+    private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (SearchPlaceholderText is null) return;
+        SearchPlaceholderText.Visibility = string.IsNullOrEmpty(SearchTextBox.Text)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
     private async Task SearchAsync()
     {
         if (_api is null || string.IsNullOrWhiteSpace(SearchTextBox.Text)) return;
+        SetActiveNavigation(null);
         var term = SearchTextBox.Text.Trim();
         var token = BeginOperation();
         ShowBusy($"正在搜索“{term}”…");
@@ -582,7 +968,7 @@ public partial class MainWindow : Window
         HomeScroll.Visibility = Visibility.Collapsed;
         BrowseScroll.Visibility = Visibility.Visible;
         BrowseBackButton.Visibility = canGoBack || _navigation.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-        BrowseStatusText.Text = $"{items.Count} 项";
+        BrowseStatusText.Text = $"内容  {items.Count}";
         BrowseEmptyText.Text = state.Kind == BrowseKind.Search ? "没有找到相关内容" : "这里还没有内容";
         BrowseEmptyText.Visibility = items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         BeginViewportImageSession();
@@ -752,13 +1138,35 @@ public partial class MainWindow : Window
     private SearchCardSection CreateSearchSection(string title, List<MediaCardViewModel> sectionCards, bool landscape)
     {
         var section = new SearchCardSection(title, sectionCards, landscape);
-        SearchSectionsStack.Children.Add(new TextBlock
+        var accent = (Brush)FindResource("AccentBrush");
+        var header = new StackPanel
         {
-            Text = $"{title}（{sectionCards.Count}）",
-            Style = (Style)FindResource("SectionTitle"),
-            Foreground = Brushes.White,
-            Margin = new Thickness(0, 6, 0, 12)
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Margin = new Thickness(0, 8, 0, 16)
+        };
+
+        header.Children.Add(new Border
+        {
+            Width = 4,
+            Height = 26,
+            Background = accent,
+            CornerRadius = new CornerRadius(2),
+            Margin = new Thickness(0, 0, 12, 0),
+            VerticalAlignment = VerticalAlignment.Center
         });
+
+        var titleText = new TextBlock
+        {
+            Text = title,
+            Foreground = Brushes.White,
+            FontSize = 24,
+            FontWeight = FontWeights.Bold,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        header.Children.Add(titleText);
+
+        SearchSectionsStack.Children.Add(header);
 
         var control = new ItemsControl
         {
@@ -833,8 +1241,34 @@ public partial class MainWindow : Window
     private void VerticalScroll_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {
         if (sender is not ScrollViewer scroller) return;
+        if ((Keyboard.Modifiers & ModifierKeys.Shift) == ModifierKeys.Shift
+            && FindHorizontalShelf(e.OriginalSource as DependencyObject, scroller) is { } shelf)
+        {
+            QueueSmoothScroll(shelf, e.Delta, horizontal: true);
+            e.Handled = true;
+            return;
+        }
         QueueSmoothScroll(scroller, e.Delta, horizontal: false);
         e.Handled = true;
+    }
+
+    private static ScrollViewer? FindHorizontalShelf(DependencyObject? origin, ScrollViewer outerScroller)
+    {
+        for (var current = origin; current is not null && !ReferenceEquals(current, outerScroller); current = GetVisualOrLogicalParent(current))
+        {
+            if (current is ScrollViewer candidate
+                && candidate.HorizontalScrollBarVisibility != ScrollBarVisibility.Disabled
+                && candidate.ScrollableWidth > 0)
+                return candidate;
+        }
+        return null;
+    }
+
+    private static DependencyObject? GetVisualOrLogicalParent(DependencyObject child)
+    {
+        if (child is Visual || child is System.Windows.Media.Media3D.Visual3D)
+            return VisualTreeHelper.GetParent(child) ?? LogicalTreeHelper.GetParent(child);
+        return LogicalTreeHelper.GetParent(child);
     }
 
     private void HorizontalSection_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
@@ -911,14 +1345,58 @@ public partial class MainWindow : Window
         if (!anyActive) _smoothScrollTimer.Stop();
     }
 
-    private void ContinueScroll_ScrollChanged(object sender, ScrollChangedEventArgs e) =>
-        ScheduleHorizontalViewport(_continueCards, preferBackdrop: true, ContinueScroll, LandscapeCellWidth);
+    private void DynamicHomeRow_ScrollChanged(object sender, ScrollChangedEventArgs e)
+    {
+        if (sender is not ScrollViewer scroller) return;
+        if (scroller.DataContext is not HomeRowViewModel row)
+        {
+            if (!_homeRowViewports.TryGetValue(scroller, out row!)) return;
+        }
+        else
+        {
+            _homeRowViewports[scroller] = row;
+        }
 
-    private void LatestMoviesScroll_ScrollChanged(object sender, ScrollChangedEventArgs e) =>
-        ScheduleHorizontalViewport(_latestMovieCards, preferBackdrop: false, LatestMoviesScroll, PosterCellWidth);
+        ScheduleHorizontalViewport(row.Cards, preferBackdrop: row.PreferBackdrop, scroller, row.CellWidth);
+    }
 
-    private void LatestEpisodesScroll_ScrollChanged(object sender, ScrollChangedEventArgs e) =>
-        ScheduleHorizontalViewport(_latestEpisodeCards, preferBackdrop: false, LatestEpisodesScroll, PosterCellWidth);
+    private void HomeScroll_ScrollChanged(object sender, ScrollChangedEventArgs e) => ScheduleVisibleHomeRowsViewport();
+
+    private void ScheduleVisibleHomeRowsViewport()
+    {
+        if (_images is null || HomeScroll.Visibility != Visibility.Visible || ViewportImageToken.IsCancellationRequested) return;
+        if (HomeScroll.ViewportHeight <= 0) return;
+
+        foreach (var pair in _homeRowViewports.ToArray())
+        {
+            var scroller = pair.Key;
+            var row = pair.Value;
+            if (!scroller.IsLoaded || scroller.Visibility != Visibility.Visible) continue;
+            try
+            {
+                var point = scroller.TranslatePoint(new Point(0, 0), HomeScroll);
+                var height = Math.Max(120, scroller.ActualHeight);
+                const double margin = 520;
+                if (point.Y < HomeScroll.ViewportHeight + margin && point.Y + height > -margin)
+                {
+                    ScheduleHorizontalViewport(row.Cards, preferBackdrop: row.PreferBackdrop, scroller, row.CellWidth);
+                }
+            }
+            catch { }
+        }
+    }
+
+    private void ScheduleHorizontalViewportForRegisteredRow(HomeRowViewModel row)
+    {
+        foreach (var (scroller, r) in _homeRowViewports)
+        {
+            if (ReferenceEquals(r, row) && scroller.IsLoaded)
+            {
+                ScheduleHorizontalViewport(row.Cards, preferBackdrop: row.PreferBackdrop, scroller, row.CellWidth);
+                break;
+            }
+        }
+    }
 
     private void BrowseScroll_ScrollChanged(object sender, ScrollChangedEventArgs e)
     {
@@ -1474,6 +1952,8 @@ public partial class MainWindow : Window
             if (backdrop is null && parent is not null)
                 backdrop = await images.GetBackdropAsync(parent, 1600, token, ImageRequestPriority.Immediate).ConfigureAwait(false);
             backdrop ??= await images.GetPrimaryAsync(item, 1600, token, ImageRequestPriority.Immediate).ConfigureAwait(false);
+            if (backdrop is null && !string.IsNullOrWhiteSpace(item.SeriesId))
+                backdrop = await images.GetPrimaryByIdAsync(item.SeriesId!, item.SeriesPrimaryImageTag, 1200, token, ImageRequestPriority.Immediate).ConfigureAwait(false);
             if (backdrop is null && parent is not null)
                 backdrop = await images.GetPrimaryAsync(parent, 1600, token, ImageRequestPriority.Immediate).ConfigureAwait(false);
 
@@ -1943,6 +2423,91 @@ public partial class MainWindow : Window
         }
     }
 
+    private async Task StartPlaybackAsync(EmbyItem item, string? sourceId = null, CancellationToken token = default)
+    {
+        if (_api is null) return;
+
+        if (_playerWindow is { IsLoaded: true })
+        {
+            _playerWindow.Activate();
+            if (_playerWindow.WindowState == WindowState.Minimized)
+                _playerWindow.WindowState = WindowState.Normal;
+            return;
+        }
+
+        // Hijack-proxy servers publish unscraped movies as "Folder"/"VideoFolder" shells with
+        // no MediaSources of their own; PlaybackInfo on them answers 410 Gone. Resolve the
+        // shell to the real playable item inside it before negotiating.
+        if (!item.CanPlay)
+        {
+            var resolved = await ResolvePlayableItemAsync(item, token);
+            if (resolved is null)
+                throw new EmbyApiException("该条目没有可直接播放的视频内容。");
+            item = resolved;
+            sourceId = null;
+        }
+
+        PlaybackPlan plan;
+        if (ReferenceEquals(item, _detailItem))
+        {
+            try
+            {
+                var playbackInfo = await GetDetailPlaybackInfoAsync(_detailItem, token);
+                plan = _api.CreatePlaybackPlan(_detailItem, playbackInfo, sourceId);
+            }
+            catch (Exception prefetchError) when (prefetchError is not OperationCanceledException)
+            {
+                LogService.Warning("Prefetched PlaybackInfo could not be reused; retrying negotiation.", prefetchError);
+                plan = await _api.CreatePlaybackPlanAsync(item, sourceId, token);
+            }
+        }
+        else
+        {
+            plan = await _api.CreatePlaybackPlanAsync(item, sourceId, token);
+        }
+
+        var player = new PlayerWindow(_api, plan, _settings, SaveSettings)
+        {
+            Owner = this,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner
+        };
+        _playerWindow = player;
+        player.Closed += PlayerWindow_Closed;
+        player.Show();
+    }
+
+    /// <summary>
+    /// Resolves a non-playable item (Folder shell / boxset / series) to the first real video
+    /// beneath it. Uses the recursive typed query that works on hijack proxies, then a plain
+    /// children listing, then the detail-item hydration as last resorts.
+    /// </summary>
+    private async Task<EmbyItem?> ResolvePlayableItemAsync(EmbyItem item, CancellationToken token)
+    {
+        if (_api is null) return null;
+
+        // 1. Recursive typed query — the only shape hijack proxies answer for folder shells.
+        try
+        {
+            var found = await _api.GetPlayableChildrenAsync(item.Id, token);
+            var pick = found.FirstOrDefault(i => i.CanPlay && i.MediaSources is { Count: > 0 })
+                       ?? found.FirstOrDefault(i => i.CanPlay);
+            if (pick is not null) return pick;
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex) { LogService.Warning($"Playable-children lookup failed for {item.Id}.", ex); }
+
+        // 2. Hydrated detail item sometimes carries MediaSources even when the list did not.
+        try
+        {
+            var hydrated = await _api.GetItemAsync(item.Id, token);
+            if (hydrated.CanPlay && hydrated.MediaSources is { Count: > 0 }) return hydrated;
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex) { LogService.Warning($"Detail hydration failed for {item.Id}.", ex); }
+
+        return null;
+    }
+
     private async void PlayButton_Click(object sender, RoutedEventArgs e)
     {
         if (_api is null || _detailItem is null) return;
@@ -1953,39 +2518,9 @@ public partial class MainWindow : Window
         DetailPlayBusyOverlay.Visibility = Visibility.Visible;
         try
         {
-            if (_playerWindow is { IsLoaded: true })
-            {
-                _playerWindow.Activate();
-                if (_playerWindow.WindowState == WindowState.Minimized)
-                    _playerWindow.WindowState = WindowState.Normal;
-                return;
-            }
-
             var sourceId = (MediaSourceComboBox.SelectedItem as MediaSourceOption)?.Source.Id;
             DetailPlayBusyText.Text = "正在协商媒体流…";
-
-            PlaybackPlan plan;
-            try
-            {
-                // Reuse the detail-page negotiation when it is still fresh. If it is currently
-                // in flight, joining it avoids issuing a duplicate PlaybackInfo request.
-                var playbackInfo = await GetDetailPlaybackInfoAsync(_detailItem, CurrentToken);
-                plan = _api.CreatePlaybackPlan(_detailItem, playbackInfo, sourceId);
-            }
-            catch (Exception prefetchError) when (prefetchError is not OperationCanceledException)
-            {
-                LogService.Warning("Prefetched PlaybackInfo could not be reused; retrying negotiation.", prefetchError);
-                plan = await _api.CreatePlaybackPlanAsync(_detailItem, sourceId, CurrentToken);
-            }
-
-            var player = new PlayerWindow(_api, plan, _settings, SaveSettings)
-            {
-                Owner = this,
-                WindowStartupLocation = WindowStartupLocation.CenterOwner
-            };
-            _playerWindow = player;
-            player.Closed += PlayerWindow_Closed;
-            player.Show();
+            await StartPlaybackAsync(_detailItem, sourceId, CurrentToken);
         }
         catch (OperationCanceledException) { }
         catch (Exception ex)
@@ -2044,6 +2579,7 @@ public partial class MainWindow : Window
     {
         // Detail owns the network budget while visible. Cancelling the previous viewport
         // session prevents off-screen home/library thumbnails from competing with hero data.
+        StopHeroRotation();
         SuspendViewportImageSession();
         MainPageContainer.Visibility = Visibility.Collapsed;
         DetailPage.Visibility = Visibility.Visible;
@@ -2069,9 +2605,8 @@ public partial class MainWindow : Window
         // cards get another chance to enter the viewport queue.
         if (HomeScroll.Visibility == Visibility.Visible)
         {
-            ScheduleHorizontalViewport(_continueCards, true, ContinueScroll, LandscapeCellWidth);
-            ScheduleHorizontalViewport(_latestMovieCards, false, LatestMoviesScroll, PosterCellWidth);
-            ScheduleHorizontalViewport(_latestEpisodeCards, false, LatestEpisodesScroll, PosterCellWidth);
+            StartHeroRotation();
+            ScheduleVisibleHomeRowsViewport();
         }
         else
         {
@@ -2200,12 +2735,18 @@ public partial class MainWindow : Window
         try
         {
             var token = CurrentToken;
-            if (endpoint.Contains("/Items/Resume", StringComparison.OrdinalIgnoreCase) || endpoint.Contains("Filters=IsResumable", StringComparison.OrdinalIgnoreCase))
+            if (endpoint.Contains("Shows/NextUp", StringComparison.OrdinalIgnoreCase))
+                await LoadNextUpHomeSectionAsync(token);
+            else if (endpoint.Contains("/Items/Resume", StringComparison.OrdinalIgnoreCase) || endpoint.Contains("Filters=IsResumable", StringComparison.OrdinalIgnoreCase))
                 await LoadResumeHomeSectionAsync(token);
+            else if (endpoint.Contains("/Suggestions", StringComparison.OrdinalIgnoreCase))
+                await LoadSuggestionsHomeSectionAsync(token);
             else if (endpoint.Contains("/Items/Latest", StringComparison.OrdinalIgnoreCase) && endpoint.Contains("IncludeItemTypes=Movie", StringComparison.OrdinalIgnoreCase))
                 await LoadLatestMoviesHomeSectionAsync(token);
             else if (endpoint.Contains("/Items/Latest", StringComparison.OrdinalIgnoreCase) && endpoint.Contains("IncludeItemTypes=Episode", StringComparison.OrdinalIgnoreCase))
                 await LoadLatestEpisodesHomeSectionAsync(token);
+            else if (endpoint.Contains("SortBy=CommunityRating", StringComparison.OrdinalIgnoreCase) && endpoint.Contains("MinCommunityRating=7", StringComparison.OrdinalIgnoreCase))
+                await LoadTopRatedHomeSectionAsync(token);
         }
         catch (OperationCanceledException) { }
         catch (Exception ex) { LogService.Warning("Unable to apply refreshed cached metadata to the visible home page.", ex); }
@@ -2224,9 +2765,16 @@ public partial class MainWindow : Window
         _viewportImageCts = null;
         _detailItem = null;
         _parentDetailCache.Clear();
-        _continueCards = [];
-        _latestMovieCards = [];
-        _latestEpisodeCards = [];
+        StopHeroRotation();
+        _heroCandidates.Clear();
+        _currentHeroItem = null;
+        try { _heroCts?.Cancel(); } catch { }
+        _heroCts?.Dispose();
+        _heroCts = null;
+        HeroPanel.Visibility = Visibility.Collapsed;
+        _homeRows.Clear();
+        _homeRowsByKey.Clear();
+        _homeRowViewports.Clear();
         _browseCards = [];
         _browseVisibleCards.Clear();
         _browseFlatLandscape = false;
@@ -2248,6 +2796,38 @@ public partial class MainWindow : Window
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        var navigateBack = (Keyboard.Modifiers & ModifierKeys.Alt) != 0 &&
+                           (e.Key == Key.Left || e.SystemKey == Key.Left);
+        if (navigateBack)
+        {
+            if (DetailPage.Visibility == Visibility.Visible)
+                RestoreMainPageAfterDetail();
+            else if (BrowseScroll.Visibility == Visibility.Visible && BrowseBackButton.Visibility == Visibility.Visible)
+                BrowseBackButton_Click(BrowseBackButton, new RoutedEventArgs());
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.Escape)
+        {
+            if (DetailPage.Visibility == Visibility.Visible)
+            {
+                RestoreMainPageAfterDetail();
+                e.Handled = true;
+            }
+            else if (LoginPanel.Visibility == Visibility.Visible)
+            {
+                ShowServerPanel();
+                e.Handled = true;
+            }
+            else if (BrowseScroll.Visibility == Visibility.Visible && BrowseBackButton.Visibility == Visibility.Visible)
+            {
+                BrowseBackButton_Click(BrowseBackButton, new RoutedEventArgs());
+                e.Handled = true;
+            }
+            if (e.Handled) return;
+        }
+
         if (e.Key == Key.F12)
         {
             DebugConsoleWindow.ShowFor(this);
@@ -2276,6 +2856,7 @@ public partial class MainWindow : Window
 
     private void Window_Closing(object? sender, CancelEventArgs e)
     {
+        StopHeroRotation();
         CancelCurrentOperation();
         CloseActivePlayer();
         ReplaceApi(null);

@@ -90,6 +90,15 @@ public sealed class ImageCacheService : IDisposable
         {
             var still = await GetEpisodePrimaryAsync(item, maxWidth, cancellationToken, priority).ConfigureAwait(false);
             if (still is not null) return still;
+
+            // Broken image enhancers often fail only for the episode still while the
+            // series poster remains healthy. Prefer a real parent poster over an empty
+            // placeholder when the server has supplied the series image identity.
+            if (!string.IsNullOrWhiteSpace(item.SeriesId))
+            {
+                var seriesPoster = await GetPrimaryByIdAsync(item.SeriesId!, item.SeriesPrimaryImageTag, maxWidth, cancellationToken, priority).ConfigureAwait(false);
+                if (seriesPoster is not null) return seriesPoster;
+            }
         }
 
         var primary = await GetPrimaryAsync(item, maxWidth, cancellationToken, priority).ConfigureAwait(false);
@@ -105,10 +114,8 @@ public sealed class ImageCacheService : IDisposable
     }
 
     /// <summary>
-    /// Episode cards must use the episode's own still image. Do not silently collapse
-    /// multiple episodes onto the series poster/backdrop, because every episode can
-    /// have a distinct Primary image in Emby. If this episode truly has no Primary
-    /// image, return null and let the UI decide an explicit fallback.
+    /// Episode cards first use the episode's own still image. If it is unavailable,
+    /// GetCardPosterAsync can deliberately fall back to the series artwork.
     /// </summary>
     public Task<BitmapSource?> GetEpisodePrimaryAsync(
         EmbyItem item,
@@ -136,6 +143,14 @@ public sealed class ImageCacheService : IDisposable
         CancellationToken cancellationToken = default,
         ImageRequestPriority priority = ImageRequestPriority.Visible) =>
         GetAsync(item.EffectiveBackdropItemId, "Backdrop", item.EffectiveBackdropTag, maxWidth, cancellationToken, priority);
+
+    public Task<BitmapSource?> GetPrimaryByIdAsync(
+        string itemId,
+        string? tag,
+        int maxWidth,
+        CancellationToken cancellationToken = default,
+        ImageRequestPriority priority = ImageRequestPriority.Visible) =>
+        GetAsyncCore(itemId, "Primary", tag, tag ?? $"primary-{itemId}", maxWidth, cancellationToken, priority);
 
     public Task<BitmapSource?> GetAsync(
         string itemId,

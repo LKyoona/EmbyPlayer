@@ -1,3 +1,27 @@
+## 0.9.0.1 — Playback Chain Hotfix（四层修复）
+
+- **数据层**：hijack 代理服务器（LongEmby 系）把每部未刮削电影暴露为两份——真实 `Movie` 条目 + 原始 `Folder` 壳。壳的 Children 端点 404、PlaybackInfo 410 Gone，列表点开即死。`GetItemsAsync` 改为 `Recursive=true + IncludeItemTypes=Movie,Series` 的类型化递归查询，在服务器侧直接过滤出真实条目（华语电影库 4318→4297 全部 CanPlay）；空结果时回退普通子项列举以保住刮削剧集库的 Series/Season 结构。
+- **逻辑层**：新增 `GetPlayableChildrenAsync`（解析容器到首个可播视频）与 `StartPlaybackAsync` 入口的 `ResolvePlayableItemAsync` 下钻——Hero"立即播放"等任何路径遇到不可播条目先解析再协商，不再直接抛 410。
+- **传输层**：移除 `:http-continuous` 媒体选项。该选项强制 VLC 用单一持久连接读完整文件，CDN 前置的 nginx 边缘在首个 Range 响应后即掐断该长连接，VLC 永久卡死在 Opening 状态——矩阵测试单变量复现确认。`:http-reconnect` 已覆盖断线恢复。
+- **身份层**：`ApplyMediaHttpHeaders` 不再默认注入浏览器形态 UA / Referer。边缘按 UA 白名单放行（`Emby/*` 与 VLC 默认 UA 通过，`Mozilla/5.0` 开头一律断流——即站规"禁止浏览器播放"的服务端执行）。UA/Referer/Cookie 仅在 `MediaSource.RequiredHttpHeaders` 明确要求时注入。
+- **构造修正**：`Media` 构造统一为 `new Media(libvlc, uri.AbsoluteUri, FromType.FromLocation)`，显式走 VLC 网络访问层；Uri 便捷重载在部分 3.x 构建中把 http URL 渲染成 UNC 形态 MRL。
+- 线路结论：HK CDN（cdn-hk.longemby.com）对 VLC 的 TLS 指纹直接掐断连接（`Interrupted function call`），cf 线完全兼容。播放默认走 cf；HK 线需待 HLS 转码模式后再启用。
+- 全链路验证：登录→列表→协商→直连 4K HEVC 杜比视界 LibVLC 实播（Playing + 持续推进）全绿。修复细节与防崩规矩见 `docs/稳定性铁律.md`。
+
+## 0.9.0.0 — Platform-grade Home Redesign
+- Hero Billboard: ~440DIP full-width banner at the top of the home page with dual-layer 450ms cross-fade, 1600px backdrop, transparent logo rendering (with fallback to display title), metadata badges, 3-line overview, "▶ 立即播放" (direct instant playback launch), "ⓘ 更多信息" (detail page), and 8s automatic rotation over top-rated / next-up / resume candidates.
+- Dynamic Content Row Engine: Replaced the static 3-row layout with an extensible data-driven home row engine. Rows render on arrival with deterministic Rank ordering and auto-hide on empty or server error:
+  - 接着看 (NextUp, 16:9 landscape cards)
+  - 继续观看 (Resume, 16:9 landscape cards with progress)
+  - 为你推荐 (Suggestions, 2:3 poster cards)
+  - 最新电影 (Latest Movies, 2:3 poster cards)
+  - 最新剧集 (Latest Episodes, 16:9 landscape cards)
+  - 高分佳作 (Top Rated 7.0+, 2:3 poster cards)
+  - 分类精选 (Top 3 Genres with bounded concurrency)
+- API & Invalidation: Emby-compliant `IncludeItemTypes` on Suggestions, name-based `Genres` filtering, separated `HomeFields` (with `Overview`), and unified `UserDataChanged` / playback-stop cache invalidation for NextUp and Recommendations.
+- Bidirectional Viewport Image Scheduling: Vertical `HomeScroll` only schedules image downloads for rows currently within ±520DIP of the viewport.
+- Shared `StartPlaybackAsync`: Extracted unified playback negotiation and player window lifecycle management.
+
 ## 0.8.3.5
 - Fixed the leaked mouse capture on a closed selector ComboBox: after a selector was dismissed programmatically the ComboBox kept WPF mouse capture, so every later click (fullscreen button included) routed into the dead ComboBox until some random interaction released it — perceived as "buttons dead for a while". A stuck capture is now released on the very next click and that click is re-dispatched to the control actually under the cursor, so switching selectors or hitting fullscreen responds instantly.
 - Pause/Play now commands LibVLC before painting UI feedback; the previous Render-priority yield deferred the real pause by a frame while the UI already showed "paused" (audio kept sounding after the picture froze).

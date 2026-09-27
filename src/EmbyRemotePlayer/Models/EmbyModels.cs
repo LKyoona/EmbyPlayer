@@ -9,10 +9,11 @@ namespace EmbyRemotePlayer.Models;
 public static class ItemNameCleaner
 {
     // Matches scraper/provider tags embedded by file-naming tools in curly or square
-    // brackets, e.g. "{tmdb-69740}", "[imdb-tt2119547]", "｛douban-247｝"-style half-width forms.
+    // brackets, including "{tmdb-69740}", "{tmdbid=574894}", "[imdb:tt2119547]"
+    // and their full-width-bracket variants.
     private static readonly Regex ProviderTag = new(
-        @"[\{\[]\s*[A-Za-z]+-[A-Za-z0-9]+\s*[\}\]]",
-        RegexOptions.Compiled);
+        @"[\{\[｛【]\s*(?:tmdb(?:id)?|imdb(?:id)?|tvdb(?:id)?|douban(?:id)?|bangumi(?:id)?)\s*[:=_-]\s*[^\}\]｝】]+\s*[\}\]｝】]",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     public static string Clean(string name)
     {
@@ -248,6 +249,7 @@ public sealed class MediaSourceInfo
     public string? DirectStreamUrl { get; set; }
     public string? TranscodingUrl { get; set; }
     public bool AddApiKeyToDirectStreamUrl { get; set; }
+    public Dictionary<string, string>? RequiredHttpHeaders { get; set; }
     public int? DefaultAudioStreamIndex { get; set; }
     public int? DefaultSubtitleStreamIndex { get; set; }
     public List<MediaStreamInfo> MediaStreams { get; set; } = [];

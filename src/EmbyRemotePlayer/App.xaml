@@ -3,23 +3,23 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              StartupUri="Views/MainWindow.xaml">
     <Application.Resources>
-        <!-- Netflix-inspired dark theme: near-black page, red brand accent, quiet gray panels. -->
-        <Color x:Key="PageColor">#FF141414</Color>
-        <Color x:Key="SurfaceColor">#FF1F1F1F</Color>
-        <Color x:Key="SurfaceAltColor">#FF2B2B2B</Color>
-        <Color x:Key="TextColor">#FFF5F5F5</Color>
-        <Color x:Key="TextMutedColor">#FFB3B3B3</Color>
-        <Color x:Key="BorderColor">#2EFFFFFF</Color>
-        <Color x:Key="AccentColor">#FFE50914</Color>
-        <Color x:Key="AccentHoverColor">#FFF61218</Color>
-        <Color x:Key="SuccessColor">#FF42D79B</Color>
-        <Color x:Key="DangerColor">#FFFF6B78</Color>
+        <!-- Comfortable Liquid Glass Cinema Palette (Apple VisionOS / Liquid Glass style) -->
+        <Color x:Key="PageColor">#FF080C14</Color>
+        <Color x:Key="SurfaceColor">#FF121722</Color>
+        <Color x:Key="SurfaceAltColor">#FF182030</Color>
+        <Color x:Key="TextColor">#FFF6F8FA</Color>
+        <Color x:Key="TextMutedColor">#FF98A2B3</Color>
+        <Color x:Key="BorderColor">#28FFFFFF</Color>
+        <Color x:Key="AccentColor">#FF0A84FF</Color>
+        <Color x:Key="AccentHoverColor">#FF389FFF</Color>
+        <Color x:Key="SuccessColor">#FF30D158</Color>
+        <Color x:Key="DangerColor">#FFFF453A</Color>
 
-        <SolidColorBrush x:Key="PageBrush" Color="#FF141414"/>
-        <SolidColorBrush x:Key="GlassBrush" Color="#F21E1E1E"/>
-        <SolidColorBrush x:Key="GlassBrightBrush" Color="#08FFFFFF"/>
-        <SolidColorBrush x:Key="AccentBrush" Color="#FFE50914"/>
-        <SolidColorBrush x:Key="AccentHoverBrush" Color="#FFF61218"/>
+        <SolidColorBrush x:Key="PageBrush" Color="#FF080C14"/>
+        <SolidColorBrush x:Key="GlassBrush" Color="#EE101622"/>
+        <SolidColorBrush x:Key="GlassBrightBrush" Color="#18FFFFFF"/>
+        <SolidColorBrush x:Key="AccentBrush" Color="#FF0A84FF"/>
+        <SolidColorBrush x:Key="AccentHoverBrush" Color="#FF389FFF"/>
         <SolidColorBrush x:Key="SurfaceBrush" Color="{StaticResource SurfaceColor}"/>
         <SolidColorBrush x:Key="SurfaceAltBrush" Color="{StaticResource SurfaceAltColor}"/>
         <SolidColorBrush x:Key="TextBrush" Color="{StaticResource TextColor}"/>
@@ -28,17 +28,42 @@
         <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource SuccessColor}"/>
         <SolidColorBrush x:Key="DangerBrush" Color="{StaticResource DangerColor}"/>
 
-        <DropShadowEffect x:Key="CardShadow" BlurRadius="26" ShadowDepth="8" Direction="270" Opacity="0.55" Color="#000000"/>
-        <DropShadowEffect x:Key="GlassShadow" BlurRadius="42" ShadowDepth="10" Direction="270" Opacity="0.55" Color="#000000"/>
-        <DropShadowEffect x:Key="AccentGlow" BlurRadius="16" ShadowDepth="0" Opacity="0.35" Color="#E50914"/>
+        <DropShadowEffect x:Key="CardShadow" BlurRadius="36" ShadowDepth="12" Direction="270" Opacity="0.65" Color="#000000"/>
+        <DropShadowEffect x:Key="GlassShadow" BlurRadius="54" ShadowDepth="14" Direction="270" Opacity="0.75" Color="#000000"/>
+        <DropShadowEffect x:Key="AccentGlow" BlurRadius="24" ShadowDepth="0" Opacity="0.45" Color="#0A84FF"/>
         <CubicEase x:Key="CardEase" EasingMode="EaseOut"/>
 
+        <!-- Universal 24x24 Vector Geometries (Fluent/Lucide standards) -->
+        <StreamGeometry x:Key="GeoHome">M 3,10.5 L 12,3 L 21,10.5 L 21,20 C 21,20.55 20.55,21 20,21 L 14,21 L 14,14 L 10,14 L 10,21 L 4,21 C 3.45,21 3,20.55 3,20 Z</StreamGeometry>
+        <StreamGeometry x:Key="GeoLibrary">M 4,4 L 10,4 L 10,10 L 4,10 Z M 14,4 L 20,4 L 20,10 L 14,10 Z M 4,14 L 10,14 L 10,20 L 4,20 Z M 14,14 L 20,14 L 20,20 L 14,20 Z</StreamGeometry>
+        <StreamGeometry x:Key="GeoHeart">M 12,21.35 C 11.74,21.35 11.48,21.25 11.28,21.05 C 6.64,16.83 3.5,13.98 2.5,11.8 C 1.25,9.08 1.83,5.68 3.84,3.8 C 5.58,2.2 8.18,2 10.38,3.24 L 12,4.16 L 13.62,3.24 C 15.82,2 18.42,2.2 20.16,3.8 C 22.17,5.68 22.75,9.08 21.5,11.8 C 20.5,13.98 17.36,16.83 12.72,21.05 C 12.52,21.25 12.26,21.35 12,21.35 Z</StreamGeometry>
+        <StreamGeometry x:Key="GeoSearch">M 15.5,14 L 14.71,14 L 14.43,13.73 C 15.41,12.59 16,11.11 16,9.5 C 16,5.91 13.09,3 9.5,3 C 5.91,3 3,5.91 3,9.5 C 3,13.09 5.91,16 9.5,16 C 11.11,16 12.59,15.41 13.73,14.43 L 14,14.71 L 14,15.5 L 19,20.49 L 20.49,19 L 15.5,14 Z M 9.5,14 C 7.01,14 5,11.99 5,9.5 C 5,7.01 7.01,5 9.5,5 C 11.99,5 14,7.01 14,9.5 C 14,11.99 11.99,14 9.5,14 Z</StreamGeometry>
+        <StreamGeometry x:Key="GeoArrowLeft">M 20,11 L 7.83,11 L 13.42,5.41 L 12,4 L 4,12 L 12,20 L 13.41,18.59 L 7.83,13 L 20,13 Z</StreamGeometry>
+        <StreamGeometry x:Key="GeoPlay">M 8,5.14 C 8,4.35 8.87,3.86 9.54,4.27 L 19.34,10.27 C 19.98,10.66 19.98,11.6 19.34,11.99 L 9.54,17.99 C 8.87,18.4 8,17.91 8,17.12 Z</StreamGeometry>
+        <StreamGeometry x:Key="GeoPause">M 6,5 C 6,4.45 6.45,4 7,4 L 9,4 C 9.55,4 10,4.45 10,5 L 10,19 C 10,19.55 9.55,20 9,20 L 7,20 C 6.45,20 6,19.55 6,19 Z M 14,5 C 14,4.45 14.45,4 15,4 L 17,4 C 17.55,4 18,4.45 18,5 L 18,19 C 18,19.55 17.55,20 17,20 L 15,20 C 14.45,20 14,19.55 14,19 Z</StreamGeometry>
+        <StreamGeometry x:Key="GeoVolumeHigh">M 3,9 L 7,9 L 12,4 L 12,20 L 7,15 L 3,15 Z M 16.5,12 C 16.5,10.23 15.48,8.71 14,7.97 L 14,16.02 C 15.48,15.29 16.5,13.77 16.5,12 Z M 14,3.23 L 14,5.29 C 16.89,6.15 19,8.83 19,12 C 19,15.17 16.89,17.85 14,18.71 L 14,20.77 C 18.01,19.86 21,16.28 21,12 C 21,7.72 18.01,4.14 14,3.23 Z</StreamGeometry>
+        <StreamGeometry x:Key="GeoVolumeMute">M 3,9 L 7,9 L 12,4 L 12,20 L 7,15 L 3,15 Z M 16.29,12 L 14.71,10.41 L 13.29,11.83 L 14.71,13.24 L 13.29,14.66 L 14.71,16.07 L 16.12,14.66 L 17.54,16.07 L 18.95,14.66 L 17.54,13.24 L 18.95,11.83 L 17.54,10.41 Z M 19.07,4.93 L 4.93,19.07 L 6.34,20.49 L 20.49,6.34 Z</StreamGeometry>
+        <StreamGeometry x:Key="GeoFullscreen">M 7,14 L 5,14 L 5,19 L 10,19 L 10,17 L 7,17 Z M 5,10 L 7,10 L 7,7 L 10,7 L 10,5 L 5,5 Z M 17,17 L 14,17 L 14,19 L 19,19 L 19,14 L 17,14 Z M 14,5 L 14,7 L 17,7 L 17,10 L 19,10 L 19,5 Z</StreamGeometry>
+        <StreamGeometry x:Key="GeoExitFullscreen">M 5,16 L 8,16 L 8,19 L 10,19 L 10,14 L 5,14 Z M 8,8 L 5,8 L 5,10 L 10,10 L 10,5 L 8,5 Z M 14,19 L 16,19 L 16,16 L 19,16 L 19,14 L 14,14 Z M 16,8 L 19,8 L 19,5 L 14,5 L 14,10 L 16,10 Z</StreamGeometry>
+        <StreamGeometry x:Key="GeoSubtitles">M 20,4 L 4,4 C 2.9,4 2,4.9 2,6 L 2,18 C 2,19.1 2.9,20 4,20 L 20,20 C 21.1,20 22,19.1 22,18 L 22,6 C 22,4.9 21.1,4 20,4 Z M 20,18 L 4,18 L 4,6 L 20,6 L 20,18 Z M 6,10 L 9,10 L 9,12 L 6,12 Z M 11,10 L 18,10 L 18,12 L 11,12 Z M 6,14 L 13,14 L 13,16 L 6,16 Z M 15,14 L 18,14 L 18,16 L 15,16 Z</StreamGeometry>
+        <StreamGeometry x:Key="GeoPlaylist">M 4,6 L 20,6 L 20,8 L 4,8 Z M 4,11 L 20,11 L 20,13 L 4,13 Z M 4,16 L 14,16 L 14,18 L 4,18 Z</StreamGeometry>
+        <StreamGeometry x:Key="GeoSpeed">M 12,2 C 6.5,2 2,6.5 2,12 C 2,17.5 6.5,22 12,22 C 17.5,22 22,17.5 22,12 C 22,6.5 17.5,2 12,2 Z M 12,20 C 7.58,20 4,16.42 4,12 C 4,7.58 7.58,4 12,4 C 16.42,4 20,7.58 20,12 C 20,16.42 16.42,20 12,20 Z M 12.5,7 L 11,7 L 11,13 L 16.25,16.15 L 17,14.92 L 12.5,12.25 Z</StreamGeometry>
+        <StreamGeometry x:Key="GeoServer">M 4,4 L 20,4 C 21.1,4 22,4.9 22,6 L 22,8 C 22,9.1 21.1,10 20,10 L 4,10 C 2.9,10 2,9.1 2,8 L 2,6 C 2,4.9 2.9,4 4,4 Z M 4,14 L 20,14 C 21.1,14 22,14.9 22,16 L 22,18 C 22,19.1 21.1,20 20,20 L 4,20 C 2.9,20 2,19.1 2,18 L 2,16 C 2,14.9 2.9,14 4,14 Z M 6,6 L 8,6 L 8,8 L 6,8 Z M 6,16 L 8,16 L 8,18 L 6,18 Z</StreamGeometry>
+        <StreamGeometry x:Key="GeoLogout">M 17,7 L 15.59,8.41 L 18.17,11 L 8,11 L 8,13 L 18.17,13 L 15.59,15.58 L 17,17 L 22,12 Z M 4,5 L 12,5 L 12,3 L 4,3 C 2.9,3 2,3.9 2,5 L 2,19 C 2,20.1 2.9,21 4,21 L 12,21 L 12,19 L 4,19 Z</StreamGeometry>
+        <StreamGeometry x:Key="GeoWindowMin">M 4,11 L 20,11 L 20,13 L 4,13 Z</StreamGeometry>
+        <StreamGeometry x:Key="GeoWindowMax">M 4,4 L 20,4 C 21.1,4 22,4.9 22,6 L 22,18 C 22,19.1 21.1,20 20,20 L 4,20 C 2.9,20 2,19.1 2,18 L 2,6 C 2,4.9 2.9,4 4,4 Z M 4,6 L 4,18 L 20,18 L 20,6 Z</StreamGeometry>
+        <StreamGeometry x:Key="GeoWindowClose">M 19,6.41 L 17.59,5 L 12,10.59 L 6.41,5 L 5,6.41 L 10.59,12 L 5,17.59 L 6.41,19 L 12,13.41 L 17.59,19 L 19,17.59 L 13.41,12 Z</StreamGeometry>
+
+        <!-- Modern Windows 11/10 Typography Stack: Razor-sharp Segoe UI Variable for Latin/Numbers, clean fallback to HarmonyOS / PingFang / YaHei -->
+        <FontFamily x:Key="AppFontFamily">Segoe UI Variable Text, Segoe UI, HarmonyOS Sans SC, PingFang SC, Microsoft YaHei UI, sans-serif</FontFamily>
+        <FontFamily x:Key="AppTitleFontFamily">Segoe UI Variable Display, Segoe UI, HarmonyOS Sans SC, PingFang SC, Microsoft YaHei UI, sans-serif</FontFamily>
+
         <Style TargetType="Window">
-            <Setter Property="FontFamily" Value="Microsoft YaHei UI"/>
+            <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
             <Setter Property="Background" Value="{StaticResource PageBrush}"/>
             <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
             <Setter Property="TextOptions.TextFormattingMode" Value="Display"/>
-            <Setter Property="TextOptions.TextRenderingMode" Value="ClearType"/>
+            <Setter Property="TextOptions.TextRenderingMode" Value="Grayscale"/>
             <Setter Property="TextOptions.TextHintingMode" Value="Fixed"/>
             <Setter Property="UseLayoutRounding" Value="True"/>
             <Setter Property="SnapsToDevicePixels" Value="True"/>
@@ -46,9 +71,9 @@
 
         <Style TargetType="TextBlock">
             <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
-            <Setter Property="FontFamily" Value="Microsoft YaHei UI"/>
+            <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
             <Setter Property="TextOptions.TextFormattingMode" Value="Display"/>
-            <Setter Property="TextOptions.TextRenderingMode" Value="ClearType"/>
+            <Setter Property="TextOptions.TextRenderingMode" Value="Grayscale"/>
             <Setter Property="TextOptions.TextHintingMode" Value="Fixed"/>
             <Setter Property="TextWrapping" Value="Wrap"/>
         </Style>
@@ -118,10 +143,10 @@
         </Style>
 
         <Style x:Key="GlassTextBox" TargetType="TextBox">
-            <Setter Property="Background" Value="#FF2B2B2B"/>
+            <Setter Property="Background" Value="#F016161A"/>
             <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
             <Setter Property="CaretBrush" Value="#FFFFFFFF"/>
-            <Setter Property="BorderBrush" Value="#002B2B2B"/>
+            <Setter Property="BorderBrush" Value="#22FFFFFF"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="12,10"/>
             <Setter Property="FontSize" Value="14"/>
@@ -131,16 +156,17 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="TextBox">
                         <Border x:Name="Root" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6" SnapsToDevicePixels="True">
+                                BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="12" SnapsToDevicePixels="True">
                             <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Root" Property="Background" Value="#FF353535"/>
+                                <Setter TargetName="Root" Property="Background" Value="#FF202024"/>
+                                <Setter TargetName="Root" Property="BorderBrush" Value="#42FFFFFF"/>
                             </Trigger>
                             <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="Root" Property="Background" Value="#FF3B3B3B"/>
-                                <Setter TargetName="Root" Property="BorderBrush" Value="#FFF5F5F5"/>
+                                <Setter TargetName="Root" Property="Background" Value="#FF121214"/>
+                                <Setter TargetName="Root" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="Root" Property="Opacity" Value="0.45"/>
@@ -153,10 +179,10 @@
         <Style TargetType="TextBox" BasedOn="{StaticResource GlassTextBox}"/>
 
         <Style x:Key="GlassPasswordBox" TargetType="PasswordBox">
-            <Setter Property="Background" Value="#FF2B2B2B"/>
+            <Setter Property="Background" Value="#F016161A"/>
             <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
             <Setter Property="CaretBrush" Value="#FFFFFFFF"/>
-            <Setter Property="BorderBrush" Value="#002B2B2B"/>
+            <Setter Property="BorderBrush" Value="#22FFFFFF"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="12,10"/>
             <Setter Property="FontSize" Value="14"/>
@@ -166,16 +192,17 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="PasswordBox">
                         <Border x:Name="Root" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6" SnapsToDevicePixels="True">
+                                BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="12" SnapsToDevicePixels="True">
                             <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Root" Property="Background" Value="#FF353535"/>
+                                <Setter TargetName="Root" Property="Background" Value="#FF202024"/>
+                                <Setter TargetName="Root" Property="BorderBrush" Value="#42FFFFFF"/>
                             </Trigger>
                             <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="Root" Property="Background" Value="#FF3B3B3B"/>
-                                <Setter TargetName="Root" Property="BorderBrush" Value="#FFF5F5F5"/>
+                                <Setter TargetName="Root" Property="Background" Value="#FF121214"/>
+                                <Setter TargetName="Root" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="Root" Property="Opacity" Value="0.45"/>
@@ -192,7 +219,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ToggleButton">
-                        <Border x:Name="Root" Background="#FF2B2B2B" BorderBrush="#00303030" BorderThickness="1" CornerRadius="6">
+                        <Border x:Name="Root" Background="#F016161A" BorderBrush="#22FFFFFF" BorderThickness="1" CornerRadius="12">
                             <Grid>
                                 <Path x:Name="Arrow" Width="9" Height="5" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,14,0"
                                       Fill="#D9FFFFFF" Data="M 0 0 L 4.5 5 L 9 0 Z"/>
@@ -200,11 +227,11 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Root" Property="Background" Value="#FF353535"/>
+                                <Setter TargetName="Root" Property="Background" Value="#FF202024"/>
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Root" Property="Background" Value="#FF3B3B3B"/>
-                                <Setter TargetName="Root" Property="BorderBrush" Value="#FFF5F5F5"/>
+                                <Setter TargetName="Root" Property="Background" Value="#FF121214"/>
+                                <Setter TargetName="Root" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
                                 <Setter TargetName="Arrow" Property="Fill" Value="#FFFFFFFF"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
@@ -245,8 +272,8 @@
 
         <Style x:Key="GlassComboBox" TargetType="ComboBox">
             <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
-            <Setter Property="Background" Value="#FF2B2B2B"/>
-            <Setter Property="BorderBrush" Value="#00303030"/>
+            <Setter Property="Background" Value="#F016161A"/>
+            <Setter Property="BorderBrush" Value="#22FFFFFF"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="12,0,40,0"/>
             <Setter Property="MinHeight" Value="44"/>
@@ -266,7 +293,7 @@
                             <Popup x:Name="PART_Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}" AllowsTransparency="True" Focusable="False"
                                    PopupAnimation="Fade">
                                 <Border Margin="0,8,0,0" MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
-                                        MaxHeight="330" Background="#F5242424" BorderBrush="#3FFFFFFF" BorderThickness="1" CornerRadius="8"
+                                        MaxHeight="330" Background="#FC121722" BorderBrush="#35FFFFFF" BorderThickness="1" CornerRadius="14"
                                         Padding="4" Effect="{StaticResource GlassShadow}">
                                     <ScrollViewer SnapsToDevicePixels="True" VerticalScrollBarVisibility="Auto">
                                         <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained"/>
@@ -293,17 +320,17 @@
             <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
             <Setter Property="BorderBrush" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding" Value="18,11"/>
+            <Setter Property="Padding" Value="20,12"/>
             <Setter Property="FontSize" Value="14"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="MinHeight" Value="44"/>
+            <Setter Property="MinHeight" Value="46"/>
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="Root" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                                BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="12" Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
@@ -311,7 +338,7 @@
                                 <Setter TargetName="Root" Property="Background" Value="{StaticResource AccentHoverBrush}"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Root" Property="Opacity" Value="0.82"/>
+                                <Setter TargetName="Root" Property="Opacity" Value="0.84"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="Root" Property="Opacity" Value="0.38"/>
@@ -324,9 +351,9 @@
 
         <Style x:Key="SecondaryButton" TargetType="Button">
             <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
-            <Setter Property="Background" Value="#FF2F2F2F"/>
-            <Setter Property="BorderBrush" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Background" Value="#E61A1A1E"/>
+            <Setter Property="BorderBrush" Value="#24FFFFFF"/>
+            <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="18,11"/>
             <Setter Property="FontSize" Value="14"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
@@ -337,12 +364,13 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="Root" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                                BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="12" Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Root" Property="Background" Value="#FF4A4A4A"/>
+                                <Setter TargetName="Root" Property="Background" Value="#FF29292E"/>
+                                <Setter TargetName="Root" Property="BorderBrush" Value="#4AFFFFFF"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="Root" Property="Opacity" Value="0.78"/>
@@ -366,7 +394,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Root" Background="{TemplateBinding Background}" CornerRadius="4" Padding="{TemplateBinding Padding}">
+                        <Border x:Name="Root" Background="{TemplateBinding Background}" CornerRadius="10" Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
@@ -386,12 +414,18 @@
         <Style x:Key="NavButton" TargetType="Button" BasedOn="{StaticResource TextButton}">
             <Setter Property="HorizontalContentAlignment" Value="Left"/>
             <Setter Property="FontSize" Value="14"/>
-            <Setter Property="Padding" Value="14,11"/>
-            <Setter Property="Margin" Value="0,2"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Padding" Value="15,13"/>
+            <Setter Property="Margin" Value="0,3"/>
+            <Style.Triggers>
+                <Trigger Property="Tag" Value="Active">
+                    <Setter Property="Foreground" Value="White"/>
+                    <Setter Property="Background" Value="#2E0A84FF"/>
+                </Trigger>
+            </Style.Triggers>
         </Style>
 
-        <!-- Netflix-style card: borderless tile, smooth hover scale-up with a shadow that only
-             exists while hovered (idle cards carry no Effect so large grids stay cheap to render). -->
+        <!-- Content-first card: gentle lift, crisp focus ring, and restrained depth. -->
         <Style x:Key="CardButton" TargetType="Button">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
@@ -403,20 +437,26 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Root" Background="Transparent" CornerRadius="6" RenderTransformOrigin="0.5,0.5">
+                        <Border x:Name="Root" Background="Transparent" BorderBrush="Transparent" BorderThickness="1"
+                                CornerRadius="14" RenderTransformOrigin="0.5,0.5">
                             <Border.RenderTransform>
-                                <ScaleTransform x:Name="CardScale" ScaleX="1" ScaleY="1"/>
+                                <TransformGroup>
+                                    <ScaleTransform x:Name="CardScale" ScaleX="1" ScaleY="1"/>
+                                    <TranslateTransform x:Name="CardLift" Y="0"/>
+                                </TransformGroup>
                             </Border.RenderTransform>
                             <ContentPresenter/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Root" Property="Effect" Value="{StaticResource CardShadow}"/>
+                                <Setter TargetName="Root" Property="BorderBrush" Value="#65FFFFFF"/>
                                 <Trigger.EnterActions>
                                     <BeginStoryboard>
                                         <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="CardScale" Storyboard.TargetProperty="ScaleX" To="1.055" Duration="0:0:0.15" EasingFunction="{StaticResource CardEase}"/>
-                                            <DoubleAnimation Storyboard.TargetName="CardScale" Storyboard.TargetProperty="ScaleY" To="1.055" Duration="0:0:0.15" EasingFunction="{StaticResource CardEase}"/>
+                                            <DoubleAnimation Storyboard.TargetName="CardScale" Storyboard.TargetProperty="ScaleX" To="1.035" Duration="0:0:0.18" EasingFunction="{StaticResource CardEase}"/>
+                                            <DoubleAnimation Storyboard.TargetName="CardScale" Storyboard.TargetProperty="ScaleY" To="1.035" Duration="0:0:0.18" EasingFunction="{StaticResource CardEase}"/>
+                                            <DoubleAnimation Storyboard.TargetName="CardLift" Storyboard.TargetProperty="Y" To="-5" Duration="0:0:0.18" EasingFunction="{StaticResource CardEase}"/>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.EnterActions>
@@ -425,12 +465,16 @@
                                         <Storyboard>
                                             <DoubleAnimation Storyboard.TargetName="CardScale" Storyboard.TargetProperty="ScaleX" To="1" Duration="0:0:0.12" EasingFunction="{StaticResource CardEase}"/>
                                             <DoubleAnimation Storyboard.TargetName="CardScale" Storyboard.TargetProperty="ScaleY" To="1" Duration="0:0:0.12" EasingFunction="{StaticResource CardEase}"/>
+                                            <DoubleAnimation Storyboard.TargetName="CardLift" Storyboard.TargetProperty="Y" To="0" Duration="0:0:0.12" EasingFunction="{StaticResource CardEase}"/>
                                         </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.ExitActions>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="Root" Property="Opacity" Value="0.82"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Root" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -439,15 +483,17 @@
         </Style>
 
         <Style x:Key="SectionTitle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="20"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Margin" Value="0,4,0,14"/>
+            <Setter Property="FontFamily" Value="{StaticResource AppTitleFontFamily}"/>
+            <Setter Property="FontSize" Value="21"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Margin" Value="0,6,0,16"/>
         </Style>
 
         <Style x:Key="PageTitle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="36"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="LineHeight" Value="44"/>
+            <Setter Property="FontFamily" Value="{StaticResource AppTitleFontFamily}"/>
+            <Setter Property="FontSize" Value="40"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="LineHeight" Value="48"/>
         </Style>
 
         <Style TargetType="CheckBox">
@@ -455,7 +501,7 @@
         </Style>
 
         <Style TargetType="ProgressBar">
-            <Setter Property="Foreground" Value="#FFE50914"/>
+            <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
             <Setter Property="Background" Value="#33FFFFFF"/>
         </Style>
     </Application.Resources>

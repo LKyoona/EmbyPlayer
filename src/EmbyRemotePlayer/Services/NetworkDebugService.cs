@@ -336,6 +336,32 @@ public static class NetworkDebugService
         AddOrReplace(entry);
     }
 
+    public static void LogPlayerProbe(Uri uri, MediaProbeResult result, double durationMs)
+    {
+        try
+        {
+            var entry = new NetworkDebugEntry
+            {
+                RequestId = NextRequestId(),
+                Attempt = 1,
+                StartedAt = DateTimeOffset.Now.AddMilliseconds(-Math.Max(0, durationMs)),
+                Method = "GET",
+                Url = SanitizeUri(uri),
+                Name = GetDisplayName(uri) + " · probe",
+                ResourceType = "media",
+                Initiator = "Media health probe",
+                StatusCode = result.StatusCode,
+                StatusText = result.Success ? "Media bytes received" : result.Summary,
+                DurationMs = durationMs,
+                QueryString = FormatQueryString(uri),
+                ResponseBody = $"媒体端点预检\n结论：{result.Summary}\n详情：{SanitizeUriText(result.Detail)}",
+                Error = result.Success ? string.Empty : SanitizeUriText(result.Summary + " · " + result.Detail)
+            };
+            AddCompleted(entry);
+        }
+        catch { }
+    }
+
     private static void AddCompleted(NetworkDebugEntry entry)
     {
         lock (Gate)

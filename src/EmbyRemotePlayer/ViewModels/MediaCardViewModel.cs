@@ -13,6 +13,7 @@ public sealed class MediaCardViewModel : NotifyObject
         Title = BuildTitle(item);
         Subtitle = BuildSubtitle(item);
         Badge = BuildBadge(item);
+        TypeBadge = BuildTypeBadge(item);
         ProgressPercent = Math.Clamp(item.UserData?.PlayedPercentage ?? 0, 0, 100);
     }
 
@@ -20,6 +21,7 @@ public sealed class MediaCardViewModel : NotifyObject
     public string Title { get; }
     public string Subtitle { get; }
     public string Badge { get; }
+    public string TypeBadge { get; }
     public double ProgressPercent { get; }
     public bool HasProgress => ProgressPercent > 0.5 && ProgressPercent < 99.5;
     public bool IsFavorite => Item.UserData?.IsFavorite == true;
@@ -75,7 +77,7 @@ public sealed class MediaCardViewModel : NotifyObject
 
     private static string BuildTitle(EmbyItem item)
     {
-        if (item.Type == "Episode" && !string.IsNullOrWhiteSpace(item.SeriesName)) return item.SeriesName;
+        if (item.Type == "Episode" && !string.IsNullOrWhiteSpace(item.SeriesName)) return ItemNameCleaner.Clean(item.SeriesName);
         return item.DisplayName;
     }
 
@@ -96,7 +98,6 @@ public sealed class MediaCardViewModel : NotifyObject
             var runtime = TimeSpan.FromTicks(item.RunTimeTicks.Value);
             parts.Add(runtime.TotalHours >= 1 ? $"{(int)runtime.TotalHours}小时{runtime.Minutes}分" : $"{runtime.Minutes}分钟");
         }
-        if (parts.Count == 0 && item.ChildCount is > 0) parts.Add($"{item.ChildCount} 项");
         return string.Join(" · ", parts);
     }
 
@@ -105,4 +106,20 @@ public sealed class MediaCardViewModel : NotifyObject
         if (item.UserData?.UnplayedItemCount is > 0) return item.UserData.UnplayedItemCount.Value.ToString();
         return string.Empty;
     }
+
+    private static string BuildTypeBadge(EmbyItem item) => item.Type switch
+    {
+        "Movie" => "电影",
+        "Series" => "剧集",
+        "Season" => "季",
+        "Episode" => "单集",
+        "BoxSet" => "合集",
+        "CollectionFolder" => "媒体库",
+        "Folder" or "VideoFolder" => "分类",
+        "Person" => "人物",
+        "MusicVideo" => "MV",
+        "Trailer" => "预告",
+        "Video" => "视频",
+        _ => string.Empty
+    };
 }

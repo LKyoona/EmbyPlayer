@@ -3,39 +3,89 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:models="clr-namespace:EmbyRemotePlayer.Models"
         xmlns:vm="clr-namespace:EmbyRemotePlayer.ViewModels"
-        Title="Emby Remote Player" Icon="pack://application:,,,/Assets/emby.ico" Width="1320" Height="840" MinWidth="900" MinHeight="580"
+        Title="Emby Remote · 私人影院" Icon="pack://application:,,,/Assets/emby.ico" Width="1440" Height="900" MinWidth="1000" MinHeight="640"
         WindowStartupLocation="CenterScreen" Closing="Window_Closing" PreviewKeyDown="Window_PreviewKeyDown"
         TextElement.Foreground="White"
-        TextElement.FontFamily="Microsoft YaHei UI"
+        TextElement.FontFamily="{StaticResource AppFontFamily}"
         TextOptions.TextFormattingMode="Display"
-        TextOptions.TextRenderingMode="ClearType"
+        TextOptions.TextRenderingMode="Grayscale"
         TextOptions.TextHintingMode="Fixed"
         UseLayoutRounding="True" SnapsToDevicePixels="True">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolVisibility"/>
 
         <LinearGradientBrush x:Key="MainBackdropBrush" StartPoint="0,0" EndPoint="1,1">
-            <GradientStop Color="#FF161616" Offset="0"/>
-            <GradientStop Color="#FF121212" Offset="0.5"/>
-            <GradientStop Color="#FF0F0F0F" Offset="1"/>
+            <GradientStop Color="#FF0B1019" Offset="0"/>
+            <GradientStop Color="#FF080C14" Offset="0.55"/>
+            <GradientStop Color="#FF060910" Offset="1"/>
         </LinearGradientBrush>
 
+        <Style x:Key="MainSearchTextBox" TargetType="TextBox">
+            <Setter Property="Foreground" Value="#FFFFFFFF"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="CaretBrush" Value="{StaticResource AccentBrush}"/>
+            <Setter Property="SelectionBrush" Value="#990A84FF"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="FontWeight" Value="Normal"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="TextAlignment" Value="Left"/>
+            <Setter Property="FlowDirection" Value="LeftToRight"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="SearchFrame" Background="#F2111113" BorderBrush="#36FFFFFF" BorderThickness="1" CornerRadius="14">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="48"/>
+                                    <ColumnDefinition Width="1"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Path x:Name="SearchIcon" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                      Stroke="#FF9B9BA1" StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                      Data="M 14.5,14.5 L 19,19 M 16.5,10 A 6.5,6.5 0 1 1 3.5,10 A 6.5,6.5 0 1 1 16.5,10"/>
+                                <Border Grid.Column="1" Width="1" Height="22" Background="#2EFFFFFF" VerticalAlignment="Center"/>
+                                <ScrollViewer x:Name="PART_ContentHost" Grid.Column="2" Margin="14,0,16,0"
+                                              HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                                              HorizontalContentAlignment="Left"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="SearchFrame" Property="Background" Value="#FF1D1D21"/>
+                                <Setter TargetName="SearchFrame" Property="BorderBrush" Value="#5AFFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="SearchFrame" Property="Background" Value="#FF111113"/>
+                                <Setter TargetName="SearchFrame" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                                <Setter TargetName="SearchIcon" Property="Stroke" Value="{StaticResource AccentBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <DataTemplate x:Key="ServerProfileTemplate" DataType="{x:Type models:ServerProfile}">
-            <Border Background="{StaticResource GlassBrush}" BorderBrush="#1FFFFFFF" BorderThickness="1"
-                    CornerRadius="10" Padding="20" Margin="0,0,0,14">
+            <Border Background="{StaticResource GlassBrush}" BorderBrush="#26FFFFFF" BorderThickness="1"
+                    CornerRadius="18" Padding="22" Margin="0,0,0,14">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="62"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <Border Width="48" Height="48" CornerRadius="15" Background="#24FFFFFF" BorderBrush="#3CFFFFFF" BorderThickness="1" VerticalAlignment="Top">
+                    <Border Width="48" Height="48" CornerRadius="14" Background="#240A84FF" BorderBrush="#600A84FF" BorderThickness="1" VerticalAlignment="Top">
                         <Image Source="pack://application:,,,/Assets/emby.png" Width="30" Height="30" Stretch="Uniform"/>
                     </Border>
                     <StackPanel Grid.Column="1" Margin="6,0,20,0">
                         <TextBlock Text="{Binding FriendlyName}" FontSize="18" FontWeight="SemiBold" Foreground="White"/>
-                        <TextBlock Text="{Binding UserName}" Foreground="White" Margin="0,5,0,0"/>
-                        <TextBlock Text="{Binding ServerUrl}" Foreground="White" FontSize="12" Margin="0,4,0,0" TextTrimming="CharacterEllipsis"/>
+                        <TextBlock Text="{Binding UserName}" Foreground="#FFC6D0DC" Margin="0,5,0,0"/>
+                        <TextBlock Text="{Binding ServerUrl}" Foreground="#FF85858B" FontSize="12" Margin="0,4,0,0" TextTrimming="CharacterEllipsis"/>
                     </StackPanel>
                     <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                         <Button Content="删除" Style="{StaticResource TextButton}" Tag="{Binding}" Click="DeleteProfileButton_Click" Margin="0,0,4,0"/>
@@ -47,9 +97,10 @@
         </DataTemplate>
 
         <DataTemplate x:Key="PosterCardTemplate" DataType="{x:Type vm:MediaCardViewModel}">
-            <Button Style="{StaticResource CardButton}" Tag="{Binding}" Click="MediaCard_Click" MouseEnter="MediaCard_MouseEnter" Width="164" Margin="0,0,18,24">
+            <Button x:Name="CardShell" Style="{StaticResource CardButton}" Tag="{Binding}" Click="MediaCard_Click" MouseEnter="MediaCard_MouseEnter"
+                    AutomationProperties.Name="{Binding Title}" Width="190" Margin="0,0,18,30">
                 <StackPanel>
-                    <Border Height="236" Background="#FF232323" CornerRadius="6" ClipToBounds="True">
+                    <Border Height="272" Background="#FF151517" BorderBrush="#24FFFFFF" BorderThickness="1" CornerRadius="14" ClipToBounds="True">
                         <Grid>
                             <!-- Neutral "no artwork" glyph: sun + mountains, replaces the green brand logo tile. -->
                             <Canvas Width="64" Height="48" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.55">
@@ -72,24 +123,45 @@
                                     <RotateTransform x:Name="LoadingSpin" CenterX="11" CenterY="11"/>
                                 </Path.RenderTransform>
                             </Path>
-                            <Border Background="#E6141414" BorderBrush="#55FFFFFF" BorderThickness="1" CornerRadius="6"
-                                    HorizontalAlignment="Right" VerticalAlignment="Top" Margin="8" Padding="7,3"
+                            <Border Background="#EA0A0A0C" BorderBrush="#36FFFFFF" BorderThickness="1" CornerRadius="8"
+                                    HorizontalAlignment="Right" VerticalAlignment="Top" Margin="10" Padding="8,4"
                                     Visibility="{Binding Badge, Converter={x:Static vm:StringVisibilityConverter.Instance}}">
                                 <TextBlock Text="{Binding Badge}" Foreground="White" FontSize="11" FontWeight="SemiBold"/>
+                            </Border>
+                            <Border Background="#D90E1422" BorderBrush="#500A84FF" BorderThickness="1" CornerRadius="7"
+                                    HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10" Padding="8,4"
+                                    Visibility="{Binding TypeBadge, Converter={x:Static vm:StringVisibilityConverter.Instance}}">
+                                <StackPanel Orientation="Horizontal">
+                                    <Ellipse Width="5" Height="5" Fill="{StaticResource AccentBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding TypeBadge}" Foreground="#FFF5F8FA" FontSize="10" FontWeight="SemiBold"/>
+                                </StackPanel>
+                            </Border>
+                            <Border x:Name="PosterPlayBadge" Width="46" Height="46" CornerRadius="23" Background="#F00A84FF"
+                                    BorderBrush="#55FFFFFF" BorderThickness="1" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                    Margin="0,0,12,13" Opacity="0" RenderTransformOrigin="0.5,0.5">
+                                <Border.RenderTransform><ScaleTransform ScaleX="0.82" ScaleY="0.82"/></Border.RenderTransform>
+                                <Path Fill="White" Data="{StaticResource GeoPlay}" Stretch="Uniform" Width="18" Height="18" Margin="2,0,0,0" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <ProgressBar Height="4" VerticalAlignment="Bottom" Minimum="0" Maximum="100"
                                          Value="{Binding ProgressPercent, Mode=OneWay}"
                                          Visibility="{Binding HasProgress, Converter={StaticResource BoolVisibility}}"
-                                         BorderThickness="0" Foreground="#FFE50914"/>
+                                         BorderThickness="0" Foreground="{StaticResource AccentBrush}"/>
                         </Grid>
                     </Border>
-                    <TextBlock Text="{Binding Title}" Foreground="#FFE8E8E8" FontFamily="Microsoft YaHei UI" FontWeight="Bold" FontSize="14" Margin="2,10,2,0"
-                               TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType" TextOptions.TextHintingMode="Fixed"/>
-                    <TextBlock Text="{Binding Subtitle}" Foreground="#FF9C9C9C" FontFamily="Microsoft YaHei UI" FontSize="12" FontWeight="Normal" Margin="2,4,2,0"
-                               TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType" TextOptions.TextHintingMode="Fixed"/>
+                    <TextBlock Text="{Binding Title}" Foreground="#FFF4F4F5" FontWeight="SemiBold" FontSize="15" LineHeight="20"
+                               Margin="2,12,2,0" MaxHeight="42" TextTrimming="CharacterEllipsis" TextWrapping="Wrap"
+                               TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="Grayscale" TextOptions.TextHintingMode="Fixed"/>
+                    <TextBlock Text="{Binding Subtitle}" Foreground="#FF909096" FontSize="12" FontWeight="Normal" Margin="2,6,2,0"
+                               TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="Grayscale" TextOptions.TextHintingMode="Fixed"/>
                 </StackPanel>
             </Button>
             <DataTemplate.Triggers>
+                <Trigger SourceName="CardShell" Property="IsMouseOver" Value="True">
+                    <Setter TargetName="PosterPlayBadge" Property="Opacity" Value="1"/>
+                    <Setter TargetName="PosterPlayBadge" Property="RenderTransform">
+                        <Setter.Value><ScaleTransform ScaleX="1" ScaleY="1"/></Setter.Value>
+                    </Setter>
+                </Trigger>
                 <DataTrigger Binding="{Binding ShowImageLoading}" Value="True">
                     <DataTrigger.EnterActions>
                         <BeginStoryboard x:Name="PosterCardLoadingSpin">
@@ -107,9 +179,10 @@
         </DataTemplate>
 
         <DataTemplate x:Key="LandscapeCardTemplate" DataType="{x:Type vm:MediaCardViewModel}">
-            <Button Style="{StaticResource CardButton}" Tag="{Binding}" Click="MediaCard_Click" MouseEnter="MediaCard_MouseEnter" Width="304" Margin="0,0,18,24">
+            <Button x:Name="CardShell" Style="{StaticResource CardButton}" Tag="{Binding}" Click="MediaCard_Click" MouseEnter="MediaCard_MouseEnter"
+                    AutomationProperties.Name="{Binding Title}" Width="380" Margin="0,0,18,28">
                 <StackPanel>
-                    <Border Height="171" Background="#FF232323" CornerRadius="6" ClipToBounds="True">
+                    <Border Height="214" Background="#FF151517" BorderBrush="#24FFFFFF" BorderThickness="1" CornerRadius="14" ClipToBounds="True">
                         <Grid>
                             <Canvas Width="80" Height="56" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.5">
                                 <Ellipse Canvas.Left="50" Canvas.Top="6" Width="14" Height="14" Fill="#59FFFFFF"/>
@@ -129,29 +202,44 @@
                                     <RotateTransform x:Name="LoadingSpin" CenterX="13" CenterY="13"/>
                                 </Path.RenderTransform>
                             </Path>
-                            <Border VerticalAlignment="Bottom" Padding="14,40,14,13">
+                            <Border VerticalAlignment="Bottom" Height="86" IsHitTestVisible="False">
                                 <Border.Background>
                                     <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
                                         <GradientStop Color="#00000000" Offset="0"/>
-                                        <GradientStop Color="#E6000000" Offset="1"/>
+                                        <GradientStop Color="#F2050506" Offset="1"/>
                                     </LinearGradientBrush>
                                 </Border.Background>
-                                <StackPanel>
-                                    <TextBlock Text="{Binding Title}" Foreground="White" FontFamily="Microsoft YaHei UI" FontWeight="Bold" FontSize="16"
-                                               TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType" TextOptions.TextHintingMode="Fixed"/>
-                                    <TextBlock Text="{Binding Subtitle}" Foreground="#FFC9C9C9" FontFamily="Microsoft YaHei UI" FontSize="12" FontWeight="Normal" Margin="0,4,0,0"
-                                               TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType" TextOptions.TextHintingMode="Fixed"/>
+                            </Border>
+                            <Border x:Name="LandscapePlayBadge" Width="48" Height="48" CornerRadius="24" Background="#F00A84FF"
+                                    BorderBrush="#55FFFFFF" BorderThickness="1" HorizontalAlignment="Right" VerticalAlignment="Top"
+                                    Margin="0,12,12,0" Opacity="0">
+                                <Path Fill="White" Data="{StaticResource GeoPlay}" Stretch="Uniform" Width="18" Height="18" Margin="2,0,0,0" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <Border Background="#D90E1422" BorderBrush="#500A84FF" BorderThickness="1" CornerRadius="7"
+                                    HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12" Padding="8,4"
+                                    Visibility="{Binding TypeBadge, Converter={x:Static vm:StringVisibilityConverter.Instance}}">
+                                <StackPanel Orientation="Horizontal">
+                                    <Ellipse Width="5" Height="5" Fill="{StaticResource AccentBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding TypeBadge}" Foreground="#FFF5F8FA" FontSize="10" FontWeight="SemiBold"/>
                                 </StackPanel>
                             </Border>
                             <ProgressBar Height="4" VerticalAlignment="Bottom" Minimum="0" Maximum="100"
                                          Value="{Binding ProgressPercent, Mode=OneWay}"
                                          Visibility="{Binding HasProgress, Converter={StaticResource BoolVisibility}}"
-                                         BorderThickness="0" Foreground="#FFE50914"/>
+                                         BorderThickness="0" Foreground="{StaticResource AccentBrush}"/>
                         </Grid>
                     </Border>
+                    <TextBlock Text="{Binding Title}" Foreground="#FFF4F4F5" FontWeight="SemiBold" FontSize="15" LineHeight="20"
+                               Margin="2,12,12,0" MaxHeight="42" TextTrimming="CharacterEllipsis" TextWrapping="Wrap"
+                               TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="Grayscale" TextOptions.TextHintingMode="Fixed"/>
+                    <TextBlock Text="{Binding Subtitle}" Foreground="#FF909096" FontSize="12" Margin="2,6,12,0"
+                               TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="Grayscale" TextOptions.TextHintingMode="Fixed"/>
                 </StackPanel>
             </Button>
             <DataTemplate.Triggers>
+                <Trigger SourceName="CardShell" Property="IsMouseOver" Value="True">
+                    <Setter TargetName="LandscapePlayBadge" Property="Opacity" Value="1"/>
+                </Trigger>
                 <DataTrigger Binding="{Binding ShowImageLoading}" Value="True">
                     <DataTrigger.EnterActions>
                         <BeginStoryboard x:Name="LandscapeCardLoadingSpin">
@@ -167,46 +255,105 @@
                 </DataTrigger>
             </DataTemplate.Triggers>
         </DataTemplate>
+
+        <DataTemplate x:Key="PosterRowTemplate" DataType="{x:Type vm:HomeRowViewModel}">
+            <Border Background="#B80C0C0E" BorderBrush="#18FFFFFF" BorderThickness="1" CornerRadius="18" Padding="22,20,0,16" Margin="0,0,0,18">
+                <StackPanel>
+                    <Grid Margin="0,0,22,16">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="{Binding Title}" Foreground="White" FontSize="24" FontWeight="Bold"/>
+                            <TextBlock Text="{Binding Subtitle}" Foreground="#FF838389" FontSize="12" Margin="0,4,0,0"
+                                       Visibility="{Binding Subtitle, Converter={x:Static vm:StringVisibilityConverter.Instance}}"/>
+                        </StackPanel>
+                        <Border Grid.Column="1" Background="#20FFFFFF" BorderBrush="#2FFFFFFF" BorderThickness="1" CornerRadius="9" Padding="10,5" HorizontalAlignment="Right" VerticalAlignment="Top"
+                                Visibility="{Binding BadgeText, Converter={x:Static vm:StringVisibilityConverter.Instance}}">
+                            <TextBlock Text="{Binding BadgeText}" Foreground="#FFD0D0D3" FontSize="11"/>
+                        </Border>
+                    </Grid>
+                    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" PanningMode="HorizontalOnly"
+                                  PreviewMouseWheel="HorizontalSection_PreviewMouseWheel" ScrollChanged="DynamicHomeRow_ScrollChanged">
+                        <ItemsControl ItemsSource="{Binding Cards}" ItemTemplate="{StaticResource PosterCardTemplate}">
+                            <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate x:Key="LandscapeRowTemplate" DataType="{x:Type vm:HomeRowViewModel}">
+            <Border Background="#D90D0D0F" BorderBrush="#20FFFFFF" BorderThickness="1" CornerRadius="18" Padding="22,20,0,16" Margin="0,0,0,18">
+                <StackPanel>
+                    <Grid Margin="0,0,22,16">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="{Binding Title}" Foreground="White" FontSize="24" FontWeight="Bold"/>
+                            <TextBlock Text="{Binding Subtitle}" Foreground="#FF838389" FontSize="12" Margin="0,4,0,0"
+                                       Visibility="{Binding Subtitle, Converter={x:Static vm:StringVisibilityConverter.Instance}}"/>
+                        </StackPanel>
+                        <Border Grid.Column="1" Background="#240A84FF" BorderBrush="#550A84FF" BorderThickness="1" CornerRadius="10" Padding="11,6" VerticalAlignment="Top"
+                                Visibility="{Binding BadgeText, Converter={x:Static vm:StringVisibilityConverter.Instance}}">
+                            <TextBlock Text="{Binding BadgeText}" Foreground="#FFD6EBFF" FontSize="11" FontWeight="SemiBold"/>
+                        </Border>
+                    </Grid>
+                    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" PanningMode="HorizontalOnly"
+                                  PreviewMouseWheel="HorizontalSection_PreviewMouseWheel" ScrollChanged="DynamicHomeRow_ScrollChanged">
+                        <ItemsControl ItemsSource="{Binding Cards}" ItemTemplate="{StaticResource LandscapeCardTemplate}">
+                            <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
+        <vm:HomeRowTemplateSelector x:Key="HomeRowSelector"
+                                    PosterRowTemplate="{StaticResource PosterRowTemplate}"
+                                    LandscapeRowTemplate="{StaticResource LandscapeRowTemplate}"/>
     </Window.Resources>
 
     <Grid Background="{StaticResource MainBackdropBrush}">
-        <Ellipse Width="720" Height="720" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="-260,-390,0,0" IsHitTestVisible="False">
+        <Ellipse Width="760" Height="760" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="-300,-420,0,0" IsHitTestVisible="False">
             <Ellipse.Fill>
-                <RadialGradientBrush><GradientStop Color="#22E50914" Offset="0"/><GradientStop Color="#00E50914" Offset="1"/></RadialGradientBrush>
+                <RadialGradientBrush><GradientStop Color="#240A84FF" Offset="0"/><GradientStop Color="#000A84FF" Offset="1"/></RadialGradientBrush>
             </Ellipse.Fill>
         </Ellipse>
         <Ellipse Width="680" Height="680" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-250,-380" IsHitTestVisible="False">
             <Ellipse.Fill>
-                <RadialGradientBrush><GradientStop Color="#12FFFFFF" Offset="0"/><GradientStop Color="#00FFFFFF" Offset="1"/></RadialGradientBrush>
+                <RadialGradientBrush><GradientStop Color="#160A84FF" Offset="0"/><GradientStop Color="#000A84FF" Offset="1"/></RadialGradientBrush>
             </Ellipse.Fill>
         </Ellipse>
 
         <!-- Server switcher -->
         <Grid x:Name="ServerPanel" Background="Transparent">
             <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-            <Grid Margin="68,52,68,26">
+            <Grid Margin="76,58,76,30">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <Image Source="pack://application:,,,/Assets/emby.png" Width="30" Height="30" Stretch="Uniform" Margin="0,0,11,0"/>
-                        <TextBlock Text="EMBY REMOTE PLAYER" Foreground="White" FontSize="12" FontWeight="Normal" VerticalAlignment="Center"/>
+                        <TextBlock Text="EMBY REMOTE  ·  PRIVATE CINEMA" Foreground="#FFA8B4C2" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"/>
                     </StackPanel>
-                    <TextBlock Text="服务器" Style="{StaticResource PageTitle}" Foreground="White" Margin="0,12,0,0"/>
+                    <TextBlock Text="选择你的媒体空间" Style="{StaticResource PageTitle}" Foreground="White" Margin="0,14,0,0"/>
                     <TextBlock Text="连接你的媒体空间。账号令牌仅保存在本机 Windows 凭据管理器。"
-                               Foreground="White" FontSize="15" Margin="0,11,0,0"/>
+                               Foreground="#FF9B9BA1" FontSize="15" Margin="0,10,0,0"/>
                 </StackPanel>
-                <Button Content="＋ 添加服务器" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Right" VerticalAlignment="Bottom" Click="AddServerButton_Click"/>
+                <Button Style="{StaticResource PrimaryButton}" HorizontalAlignment="Right" VerticalAlignment="Bottom" Click="AddServerButton_Click">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Path Fill="White" Data="M 19,13 L 13,13 L 13,19 L 11,19 L 11,13 L 5,13 L 5,11 L 11,11 L 11,5 L 13,5 L 13,11 L 19,11 Z" Stretch="Uniform" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="添加服务器" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
             </Grid>
             <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-                <StackPanel Width="790" HorizontalAlignment="Center" Margin="0,10,0,64">
+                <StackPanel Width="820" HorizontalAlignment="Center" Margin="0,12,0,70">
                     <ItemsControl x:Name="ProfilesItemsControl" ItemTemplate="{StaticResource ServerProfileTemplate}"/>
                     <Border x:Name="EmptyProfilesCard" Background="{StaticResource GlassBrush}" BorderBrush="#44FFFFFF" BorderThickness="1"
-                            CornerRadius="24" Padding="54" Visibility="Collapsed" Effect="{StaticResource GlassShadow}">
+                            CornerRadius="28" Padding="60" Visibility="Collapsed" Effect="{StaticResource GlassShadow}">
                         <StackPanel HorizontalAlignment="Center">
-                            <Border Width="66" Height="66" CornerRadius="21" Background="#24FFFFFF" BorderBrush="#45FFFFFF" BorderThickness="1">
+                            <Border Width="72" Height="72" CornerRadius="22" Background="#240A84FF" BorderBrush="#600A84FF" BorderThickness="1">
                                 <Image Source="pack://application:,,,/Assets/emby.png" Width="42" Height="42" Stretch="Uniform"/>
                             </Border>
                             <TextBlock Text="还没有服务器" FontSize="23" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Center" Margin="0,20,0,0"/>
-                            <TextBlock Text="添加服务器后即可浏览和播放 Emby 媒体库。" Foreground="White" Margin="0,10,0,24"/>
+                            <TextBlock Text="添加服务器后，即刻进入属于你的私人影院。" Foreground="#FF9B9BA1" Margin="0,10,0,26"/>
                             <Button Content="添加第一个服务器" Style="{StaticResource PrimaryButton}" Click="AddServerButton_Click"/>
                         </StackPanel>
                     </Border>
@@ -216,17 +363,22 @@
 
         <!-- Login / add profile -->
         <Grid x:Name="LoginPanel" Background="Transparent" Visibility="Collapsed">
-            <Button Content="← 返回" Style="{StaticResource TextButton}" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="30" Click="BackToServersButton_Click"/>
-            <Border Width="500" Background="{StaticResource GlassBrush}" BorderBrush="#48FFFFFF" BorderThickness="1" CornerRadius="28"
-                    Padding="44" HorizontalAlignment="Center" VerticalAlignment="Center" Effect="{StaticResource GlassShadow}">
+            <Button Style="{StaticResource TextButton}" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="34" Click="BackToServersButton_Click">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Path Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Data="{StaticResource GeoArrowLeft}" Stretch="Uniform" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="返回服务器" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Button>
+            <Border Width="520" Background="{StaticResource GlassBrush}" BorderBrush="#35FFFFFF" BorderThickness="1" CornerRadius="30"
+                    Padding="48" HorizontalAlignment="Center" VerticalAlignment="Center" Effect="{StaticResource GlassShadow}">
                 <Grid>
                     <Border Background="{StaticResource GlassBrightBrush}" CornerRadius="27" IsHitTestVisible="False"/>
                     <StackPanel>
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                             <Image Source="pack://application:,,,/Assets/emby.png" Width="40" Height="40" Stretch="Uniform" Margin="0,0,13,0"/>
-                            <TextBlock Text="连接 Emby" FontSize="31" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+                            <TextBlock Text="连接 Emby" FontSize="32" FontWeight="SemiBold" Foreground="White" VerticalAlignment="Center"/>
                         </StackPanel>
-                        <TextBlock Text="输入服务器地址和 Emby 账号。" Foreground="White" Margin="0,8,0,28"/>
+                        <TextBlock Text="安全连接你的服务器，继续私人观影旅程。" Foreground="#FF9B9BA1" Margin="0,8,0,30"/>
                         <TextBlock Text="显示名称" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,8"/>
                         <TextBox x:Name="DisplayNameTextBox" Margin="0,0,0,17"/>
                         <TextBlock Text="服务器地址" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,8"/>
@@ -246,77 +398,182 @@
         <!-- Main application -->
         <Grid x:Name="AppPanel" Visibility="Collapsed">
             <Grid x:Name="AppContentRoot">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="236"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <Border Margin="14,14,10,14" Background="#F21A1A1A" BorderBrush="#14FFFFFF" BorderThickness="1" CornerRadius="12">
-                    <Grid Margin="18,24,16,18">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="218"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <Border Background="#FC09090B" BorderBrush="#20FFFFFF" BorderThickness="0,0,1,0">
+                    <Grid Margin="18,28,18,20">
                         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                         <StackPanel>
                             <StackPanel Orientation="Horizontal">
-                                <Border Width="30" Height="30" CornerRadius="7" Background="#FFE50914" VerticalAlignment="Center">
-                                    <TextBlock Text="E" Foreground="White" FontSize="17" FontWeight="Black" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                <Border Width="40" Height="40" CornerRadius="11" Background="{StaticResource AccentBrush}" VerticalAlignment="Center" Effect="{StaticResource AccentGlow}">
+                                    <TextBlock Text="E" Foreground="White" FontSize="20" FontWeight="Black" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Border>
-                                <TextBlock Text="Emby" Foreground="White" FontSize="22" FontWeight="Bold" VerticalAlignment="Center" Margin="10,0,0,1"/>
+                                <StackPanel Margin="11,0,0,0" VerticalAlignment="Center">
+                                    <TextBlock Text="Emby Player" Foreground="White" FontSize="18" FontWeight="Bold"/>
+                                    <TextBlock Text="REMOTE CINEMA" Foreground="#FF77777E" FontSize="9" FontWeight="SemiBold" Margin="0,2,0,0"/>
+                                </StackPanel>
                             </StackPanel>
-                            <TextBlock x:Name="CurrentServerText" Foreground="#FF8C8C8C" FontSize="12" Margin="0,8,0,0" TextTrimming="CharacterEllipsis"/>
-                            <TextBlock x:Name="AppVersionText" Foreground="#66FFFFFF" FontSize="11" Margin="0,4,0,0"/>
+                            <Border Background="#1E0A84FF" BorderBrush="#450A84FF" BorderThickness="1" CornerRadius="10" Padding="10,8" Margin="0,16,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="●  当前媒体空间" Foreground="{StaticResource AccentBrush}" FontSize="10" FontWeight="SemiBold"/>
+                                    <TextBlock x:Name="CurrentServerText" Foreground="#FFD0D0D3" FontSize="12" Margin="0,5,0,0" TextTrimming="CharacterEllipsis"/>
+                                </StackPanel>
+                            </Border>
+                            <TextBlock x:Name="AppVersionText" Foreground="#667F7F85" FontSize="10" Margin="2,7,0,0"/>
                         </StackPanel>
-                        <StackPanel Grid.Row="1" Margin="0,29,0,0">
-                            <Button Content="⌂  首页" Style="{StaticResource NavButton}" Click="HomeButton_Click"/>
-                            <Button Content="▦  媒体库" Style="{StaticResource NavButton}" Click="LibrariesButton_Click"/>
-                            <Button Content="♡  收藏" Style="{StaticResource NavButton}" Click="FavoritesButton_Click"/>
+                        <StackPanel Grid.Row="1" Margin="0,30,0,0">
+                            <TextBlock Text="浏览" Foreground="#FF6F6F76" FontSize="10" FontWeight="SemiBold" Margin="14,0,0,8"/>
+                            <Button x:Name="HomeNavButton" Tag="Active" Style="{StaticResource NavButton}" Click="HomeButton_Click" AutomationProperties.Name="首页">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Path Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Data="{StaticResource GeoHome}" Stretch="Uniform" Width="18" Height="18" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="首页" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="LibrariesNavButton" Style="{StaticResource NavButton}" Click="LibrariesButton_Click" AutomationProperties.Name="媒体库">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Path Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Data="{StaticResource GeoLibrary}" Stretch="Uniform" Width="18" Height="18" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="媒体库" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="FavoritesNavButton" Style="{StaticResource NavButton}" Click="FavoritesButton_Click" AutomationProperties.Name="我的收藏">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Path Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Data="{StaticResource GeoHeart}" Stretch="Uniform" Width="18" Height="18" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="我的收藏" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
                         </StackPanel>
                         <StackPanel Grid.Row="3">
-                            <Button Content="网络调试  ·  F12" Style="{StaticResource TextButton}" Click="OpenDebugConsoleButton_Click" Margin="0,0,0,8"/>
-                            <Button Content="切换服务器" Style="{StaticResource SecondaryButton}" Click="SwitchServerButton_Click" Margin="0,0,0,8"/>
-                            <Button Content="退出账号" Style="{StaticResource TextButton}" Click="LogoutButton_Click"/>
+                            <Button Content="网络状态  ·  F12" Style="{StaticResource TextButton}" Click="OpenDebugConsoleButton_Click" Margin="0,0,0,8" ToolTip="查看网络请求和播放器诊断"/>
+                            <Button Style="{StaticResource SecondaryButton}" Click="SwitchServerButton_Click" Margin="0,0,0,8">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <Path Fill="White" Data="{StaticResource GeoServer}" Stretch="Uniform" Width="15" Height="15" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="切换媒体空间" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Style="{StaticResource TextButton}" Click="LogoutButton_Click">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <Path Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Data="{StaticResource GeoLogout}" Stretch="Uniform" Width="15" Height="15" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="退出当前账号" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
                         </StackPanel>
                     </Grid>
                 </Border>
 
                 <!-- Main/browse page. Detail navigation replaces this page instead of opening a modal layer. -->
                 <Grid x:Name="MainPageContainer" Grid.Column="1">
-                    <Grid.RowDefinitions><RowDefinition Height="86"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-                    <Grid Margin="34,22,36,12">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="340"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions><RowDefinition Height="104"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                    <Grid Margin="34,20,38,12">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="440"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                         <StackPanel VerticalAlignment="Center">
-                            <TextBlock x:Name="HeaderTitleText" Text="首页" FontSize="28" FontWeight="Bold" Foreground="White"/>
-                            <TextBlock Text="你的个人媒体空间" Foreground="#FF8C8C8C" FontSize="12" Margin="0,3,0,0"/>
+                            <TextBlock x:Name="HeaderTitleText" Text="首页" FontSize="34" FontWeight="Bold" Foreground="White"/>
+                            <TextBlock Text="电影、剧集与此刻想看的故事" Foreground="#FF85858B" FontSize="12" Margin="0,4,0,0"/>
                         </StackPanel>
-                        <TextBox x:Name="SearchTextBox" Grid.Column="1" VerticalAlignment="Center" KeyDown="SearchTextBox_KeyDown" ToolTip="搜索电影、剧集和人物（Ctrl+F）"/>
-                        <Button Grid.Column="2" Content="搜索" Style="{StaticResource PrimaryButton}" Margin="10,0,0,0" VerticalAlignment="Center" Click="SearchButton_Click"/>
+                        <Grid Grid.Column="1" Height="54" VerticalAlignment="Center">
+                            <TextBox x:Name="SearchTextBox" Style="{StaticResource MainSearchTextBox}" KeyDown="SearchTextBox_KeyDown" TextChanged="SearchTextBox_TextChanged"
+                                     AutomationProperties.Name="搜索电影、剧集和人物" AutomationProperties.HelpText="按 Enter 开始搜索"
+                                     ToolTip="搜索电影、剧集和人物（Ctrl+F / Ctrl+K）"/>
+                            <TextBlock x:Name="SearchPlaceholderText" Text="搜索电影、剧集、人物…" Foreground="#FF85858B" FontSize="14" Margin="63,0,16,0"
+                                       HorizontalAlignment="Stretch" TextAlignment="Left" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                        </Grid>
+                        <Button Grid.Column="2" Content="搜索" Style="{StaticResource PrimaryButton}" Height="54" MinWidth="84" Margin="10,0,0,0" VerticalAlignment="Center" Click="SearchButton_Click"/>
                     </Grid>
 
                     <Grid Grid.Row="1">
-                        <ScrollViewer x:Name="HomeScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly" PreviewMouseWheel="VerticalScroll_PreviewMouseWheel">
-                            <StackPanel Margin="30,16,34,62">
-                                <TextBlock Text="继续观看" Style="{StaticResource SectionTitle}" Foreground="White"/>
-                                <TextBlock x:Name="ContinueEmptyText" Text="没有未看完的内容" Foreground="#78FFFFFF" Margin="0,0,0,24" Visibility="Collapsed"/>
-                                <ScrollViewer x:Name="ContinueScroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" PanningMode="HorizontalOnly" PreviewMouseWheel="HorizontalSection_PreviewMouseWheel" Margin="0,0,0,20" ScrollChanged="ContinueScroll_ScrollChanged">
-                                    <ItemsControl x:Name="ContinueItemsControl" ItemTemplate="{StaticResource LandscapeCardTemplate}">
-                                        <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-                                    </ItemsControl>
-                                </ScrollViewer>
-                                <TextBlock Text="最新电影" Style="{StaticResource SectionTitle}" Foreground="White"/>
-                                <ScrollViewer x:Name="LatestMoviesScroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" PanningMode="HorizontalOnly" PreviewMouseWheel="HorizontalSection_PreviewMouseWheel" Margin="0,0,0,20" ScrollChanged="LatestMoviesScroll_ScrollChanged">
-                                    <ItemsControl x:Name="LatestMoviesItemsControl" ItemTemplate="{StaticResource PosterCardTemplate}">
-                                        <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-                                    </ItemsControl>
-                                </ScrollViewer>
-                                <TextBlock Text="最新剧集" Style="{StaticResource SectionTitle}" Foreground="White"/>
-                                <ScrollViewer x:Name="LatestEpisodesScroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" PanningMode="HorizontalOnly" PreviewMouseWheel="HorizontalSection_PreviewMouseWheel" ScrollChanged="LatestEpisodesScroll_ScrollChanged">
-                                    <ItemsControl x:Name="LatestEpisodesItemsControl" ItemTemplate="{StaticResource PosterCardTemplate}">
-                                        <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-                                    </ItemsControl>
-                                </ScrollViewer>
+                        <ScrollViewer x:Name="HomeScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly" PreviewMouseWheel="VerticalScroll_PreviewMouseWheel" ScrollChanged="HomeScroll_ScrollChanged">
+                            <StackPanel Margin="32,12,36,72">
+                                <!-- Hero Billboard Banner (~440DIP) with dual-layer smooth cross-fade -->
+                                <Border x:Name="HeroPanel" Height="440" CornerRadius="20" Margin="0,0,0,26" ClipToBounds="True" Background="#FF111113" Visibility="Collapsed">
+                                    <Grid>
+                                        <Image x:Name="HeroBackdropImageB" Stretch="UniformToFill" Opacity="0"/>
+                                        <Image x:Name="HeroBackdropImageA" Stretch="UniformToFill" Opacity="1"/>
+
+                                        <!-- Left-to-right gradient for text contrast -->
+                                        <Border IsHitTestVisible="False">
+                                            <Border.Background>
+                                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                                    <GradientStop Color="#FA09090C" Offset="0"/>
+                                                    <GradientStop Color="#E609090C" Offset="0.36"/>
+                                                    <GradientStop Color="#8809090C" Offset="0.65"/>
+                                                    <GradientStop Color="#0009090C" Offset="1"/>
+                                                </LinearGradientBrush>
+                                            </Border.Background>
+                                        </Border>
+
+                                        <!-- Bottom gradient overlay -->
+                                        <Border VerticalAlignment="Bottom" Height="140" IsHitTestVisible="False">
+                                            <Border.Background>
+                                                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                    <GradientStop Color="#00000000" Offset="0"/>
+                                                    <GradientStop Color="#F509090C" Offset="1"/>
+                                                </LinearGradientBrush>
+                                            </Border.Background>
+                                        </Border>
+
+                                        <!-- Content Column -->
+                                        <Grid Margin="44,36,44,32">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="*"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+
+                                            <StackPanel MaxWidth="640" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                                <Image x:Name="HeroLogoImage" MaxHeight="86" MaxWidth="380" HorizontalAlignment="Left" Stretch="Uniform" Margin="0,0,0,14" Visibility="Collapsed"/>
+                                                <TextBlock x:Name="HeroTitleText" FontSize="36" FontWeight="Bold" Foreground="White" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" Margin="0,0,0,10"/>
+
+                                                <!-- Meta: Year · Rating · Genres -->
+                                                <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                                                    <Border x:Name="HeroBadgeBorder" Background="#240A84FF" BorderBrush="#550A84FF" BorderThickness="1" CornerRadius="6" Padding="7,3" Margin="0,0,10,0" VerticalAlignment="Center">
+                                                        <TextBlock x:Name="HeroBadgeText" Text="热门精选" Foreground="#FFD6EBFF" FontSize="11" FontWeight="SemiBold"/>
+                                                    </Border>
+                                                    <TextBlock x:Name="HeroMetaText" Foreground="#FFCCCCCC" FontSize="13" VerticalAlignment="Center"/>
+                                                </StackPanel>
+
+                                                <!-- Overview 3-line clamp -->
+                                                <TextBlock x:Name="HeroOverviewText" Foreground="#FFAAAAAF" FontSize="13.5" LineHeight="20" MaxHeight="60" TextTrimming="CharacterEllipsis" TextWrapping="Wrap" Margin="0,0,0,20"/>
+
+                                                <!-- Action Buttons -->
+                                                <StackPanel Orientation="Horizontal">
+                                                    <Button x:Name="HeroPlayButton" Style="{StaticResource PrimaryButton}" Height="46" Padding="22,0" FontSize="15" Margin="0,0,12,0" Click="HeroPlayButton_Click">
+                                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                            <Path Fill="White" Data="{StaticResource GeoPlay}" Stretch="Uniform" Width="16" Height="16" Margin="0,0,9,0" VerticalAlignment="Center"/>
+                                                            <TextBlock Text="立即播放" VerticalAlignment="Center"/>
+                                                        </StackPanel>
+                                                    </Button>
+                                                    <Button x:Name="HeroDetailsButton" Style="{StaticResource SecondaryButton}" Height="46" Padding="20,0" FontSize="14" Click="HeroDetailsButton_Click">
+                                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                            <Path Fill="White" Data="M 12,2 C 6.48,2 2,6.48 2,12 C 2,17.52 6.48,22 12,22 C 17.52,22 22,17.52 22,12 C 22,6.48 17.52,2 12,2 Z M 13,17 L 11,17 L 11,11 L 13,11 Z M 13,9 L 11,9 L 11,7 L 13,7 Z" Stretch="Uniform" Width="15" Height="15" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                                            <TextBlock Text="更多信息" VerticalAlignment="Center"/>
+                                                        </StackPanel>
+                                                    </Button>
+                                                </StackPanel>
+                                            </StackPanel>
+
+                                            <!-- Indicators (dots) -->
+                                            <StackPanel x:Name="HeroIndicatorsPanel" Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom"/>
+                                        </Grid>
+                                    </Grid>
+                                </Border>
+
+                                <TextBlock x:Name="HomeEmptyStateText" Text="你的媒体空间还没有准备好内容" Foreground="#78FFFFFF" FontSize="16" HorizontalAlignment="Center" Margin="0,80,0,0" Visibility="Collapsed"/>
+                                <ItemsControl x:Name="HomeRowsItemsControl" ItemTemplateSelector="{StaticResource HomeRowSelector}"/>
                             </StackPanel>
                         </ScrollViewer>
 
                         <ScrollViewer x:Name="BrowseScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly" Visibility="Collapsed" ScrollChanged="BrowseScroll_ScrollChanged" PreviewMouseWheel="VerticalScroll_PreviewMouseWheel">
-                            <StackPanel Margin="30,16,34,62">
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,18">
-                                    <Button x:Name="BrowseBackButton" Content="← 返回" Style="{StaticResource TextButton}" Click="BrowseBackButton_Click" Visibility="Collapsed" Margin="0,0,10,0"/>
-                                    <TextBlock x:Name="BrowseStatusText" Foreground="White" VerticalAlignment="Center"/>
-                                </StackPanel>
+                            <StackPanel Margin="32,12,36,72">
+                                <Border Background="#D90D0D0F" BorderBrush="#20FFFFFF" BorderThickness="1" CornerRadius="14" Padding="12,10" Margin="0,0,0,22">
+                                    <Grid>
+                                        <Button x:Name="BrowseBackButton" Style="{StaticResource TextButton}" Click="BrowseBackButton_Click" Visibility="Collapsed" HorizontalAlignment="Left">
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <Path Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Data="{StaticResource GeoArrowLeft}" Stretch="Uniform" Width="15" Height="15" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                                <TextBlock Text="返回" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+                                        <Border HorizontalAlignment="Right" Background="#240A84FF" BorderBrush="#550A84FF" BorderThickness="1" CornerRadius="10" Padding="12,6">
+                                            <TextBlock x:Name="BrowseStatusText" Foreground="#FFD6EBFF" FontSize="11" FontWeight="SemiBold"/>
+                                        </Border>
+                                    </Grid>
+                                </Border>
                                 <ItemsControl x:Name="BrowseItemsControl" ItemTemplate="{StaticResource PosterCardTemplate}">
                                     <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                                 </ItemsControl>
@@ -326,17 +583,17 @@
                         </ScrollViewer>
 
                         <Border x:Name="BusyOverlay" Background="Transparent" Visibility="Collapsed" IsHitTestVisible="False">
-                            <Border Width="230" Background="#F21C1C1C" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="10" Padding="18" Margin="0,10,26,0"
+                            <Border Width="230" Background="#EE121722" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,10,26,0"
                                     HorizontalAlignment="Right" VerticalAlignment="Top">
                                 <StackPanel>
-                                    <ProgressBar Width="190" Height="3" IsIndeterminate="True" BorderThickness="0"/>
+                                    <ProgressBar Width="190" Height="3" IsIndeterminate="True" BorderThickness="0" Foreground="{StaticResource AccentBrush}"/>
                                     <TextBlock x:Name="BusyText" Text="正在加载…" Foreground="White" HorizontalAlignment="Center" Margin="0,9,0,0" FontSize="12"/>
                                 </StackPanel>
                             </Border>
                         </Border>
 
                         <!-- Non-blocking error toast: flaky servers must never interrupt with modal dialogs. -->
-                        <Border x:Name="MainErrorToast" Background="#F22B1B1B" BorderBrush="#FFE50914" BorderThickness="1" CornerRadius="10"
+                        <Border x:Name="MainErrorToast" Background="#F2221820" BorderBrush="{StaticResource DangerBrush}" BorderThickness="1" CornerRadius="10"
                                 Padding="16,11" Margin="0,64,26,0" MaxWidth="480" HorizontalAlignment="Right" VerticalAlignment="Top"
                                 Visibility="Collapsed" Cursor="Hand" MouseLeftButtonUp="MainErrorToast_Click" ToolTip="点击关闭">
                             <StackPanel>
@@ -348,50 +605,60 @@
                 </Grid>
 
                 <!-- Native in-window detail page: no modal, no blur, no second window. -->
-                <Grid x:Name="DetailPage" Grid.Column="1" Visibility="Collapsed" Background="#FF101010">
+                <Grid x:Name="DetailPage" Grid.Column="1" Visibility="Collapsed" Background="#FF070708">
                     <ScrollViewer x:Name="DetailScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" PanningMode="VerticalOnly" ScrollChanged="DetailScroll_ScrollChanged" PreviewMouseWheel="VerticalScroll_PreviewMouseWheel">
                         <StackPanel>
                             <!-- Hero -->
-                            <Grid Height="360" Background="#171A28" ClipToBounds="True">
+                            <Grid Height="430" Background="#FF111113" ClipToBounds="True">
                                 <Image x:Name="DetailBackdropImage" Stretch="UniformToFill"/>
                                 <Border>
                                     <Border.Background>
                                         <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                            <GradientStop Color="#26080A13" Offset="0"/>
-                                            <GradientStop Color="#16080A13" Offset="0.42"/>
-                                            <GradientStop Color="#E80A0C17" Offset="1"/>
+                                        <GradientStop Color="#16070708" Offset="0"/>
+                                        <GradientStop Color="#32070708" Offset="0.42"/>
+                                        <GradientStop Color="#FF070708" Offset="1"/>
                                         </LinearGradientBrush>
                                     </Border.Background>
                                 </Border>
-                                <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="28,24" CornerRadius="22" Background="#8C202435" BorderBrush="#48FFFFFF" BorderThickness="1">
-                                    <Button Content="←  返回" Style="{StaticResource TextButton}" Padding="16,10" Click="DetailBackButton_Click"/>
+                                <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="30,26" CornerRadius="14" Background="#C90D141D" BorderBrush="#38FFFFFF" BorderThickness="1">
+                                    <Button Style="{StaticResource TextButton}" Padding="16,10" Click="DetailBackButton_Click">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Path Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Data="{StaticResource GeoArrowLeft}" Stretch="Uniform" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                            <TextBlock Text="返回浏览" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
                                 </Border>
-                                <Image x:Name="DetailLogoImage" MaxWidth="360" MaxHeight="110" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="40,0,40,42"/>
+                                <Image x:Name="DetailLogoImage" MaxWidth="420" MaxHeight="130" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="40,0,40,58"/>
                             </Grid>
 
-                            <StackPanel Margin="36,0,42,72" MaxWidth="1120">
+                            <StackPanel Margin="42,0,48,84" MaxWidth="1160">
                                 <!-- title / metadata / actions -->
-                                <Grid Margin="0,-12,0,0">
+                                <Grid Margin="0,-18,0,0">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                     <StackPanel>
-                                        <TextBlock x:Name="DetailTitleText" FontSize="38" FontWeight="Bold" LineHeight="45" Foreground="White"/>
-                                        <TextBlock x:Name="DetailOriginalTitleText" Foreground="White" FontSize="14" Margin="0,6,0,0" Visibility="Collapsed"/>
-                                        <TextBlock x:Name="DetailMetaText" Foreground="White" FontSize="15" Margin="0,12,0,0"/>
-                                        <TextBlock x:Name="DetailUserStateText" Foreground="White" FontSize="12" Margin="0,7,0,0"/>
+                                        <TextBlock x:Name="DetailTitleText" FontSize="42" FontWeight="SemiBold" LineHeight="50" Foreground="White"/>
+                                        <TextBlock x:Name="DetailOriginalTitleText" Foreground="#FF9B9BA1" FontSize="14" Margin="0,7,0,0" Visibility="Collapsed"/>
+                                        <TextBlock x:Name="DetailMetaText" Foreground="#FFD5DDE6" FontSize="15" Margin="0,13,0,0"/>
+                                        <TextBlock x:Name="DetailUserStateText" Foreground="{StaticResource AccentBrush}" FontSize="12" FontWeight="SemiBold" Margin="0,8,0,0"/>
                                     </StackPanel>
-                                    <Button x:Name="PlayButton" Grid.Column="1" Content="▶  播放" Style="{StaticResource PrimaryButton}" Click="PlayButton_Click" MouseEnter="PlayButton_MouseEnter"
-                                            FontSize="16" MinWidth="170" Height="52" VerticalAlignment="Bottom" Margin="28,0,0,0"/>
+                                    <Button x:Name="PlayButton" Grid.Column="1" Style="{StaticResource PrimaryButton}" Click="PlayButton_Click" MouseEnter="PlayButton_MouseEnter"
+                                            FontSize="16" MinWidth="184" Height="54" VerticalAlignment="Bottom" Margin="30,0,0,0" ToolTip="开始播放（Enter）">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Path Fill="White" Data="{StaticResource GeoPlay}" Stretch="Uniform" Width="18" Height="18" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                            <TextBlock Text="播放" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
                                 </Grid>
 
                                 <Grid Margin="0,22,0,0" Visibility="Collapsed" x:Name="DetailProgressPanel">
                                     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                                     <ProgressBar x:Name="DetailProgressBar" Height="5" Minimum="0" Maximum="100" Value="0" BorderThickness="0" VerticalAlignment="Center"/>
-                                    <TextBlock x:Name="DetailProgressText" Grid.Column="1" Margin="16,0,0,0" Foreground="White" FontSize="12"/>
+                                    <TextBlock x:Name="DetailProgressText" Grid.Column="1" Margin="16,0,0,0" Foreground="#FFB6C2CE" FontSize="12"/>
                                 </Grid>
 
-                                <TextBlock x:Name="DetailTaglineText" FontSize="18" FontWeight="SemiBold" Foreground="White" Margin="0,26,0,0" Visibility="Collapsed"/>
-                                <TextBlock x:Name="DetailOverviewText" FontSize="15" LineHeight="26" Foreground="White" Margin="0,16,0,0" MaxWidth="1030"/>
+                                <TextBlock x:Name="DetailTaglineText" FontSize="18" FontWeight="SemiBold" Foreground="#FFE7EDF4" Margin="0,28,0,0" Visibility="Collapsed"/>
+                                <TextBlock x:Name="DetailOverviewText" FontSize="15" LineHeight="28" Foreground="#FFB4BFCC" Margin="0,16,0,0" MaxWidth="1060"/>
                                 <TextBlock x:Name="DetailErrorText" Foreground="{StaticResource DangerBrush}" Margin="0,12,0,0" Visibility="Collapsed"/>
 
                                 <!-- Version -->
@@ -401,16 +668,16 @@
                                 </StackPanel>
 
                                 <!-- Selected source technical summary -->
-                                <Border Margin="0,18,0,0" Background="#12FFFFFF" BorderBrush="#30FFFFFF" BorderThickness="1" CornerRadius="18" Padding="20">
+                                <Border Margin="0,18,0,0" Background="#B8101721" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="18" Padding="22">
                                     <Grid>
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="1.05*"/><ColumnDefinition Width="0.95*"/></Grid.ColumnDefinitions>
                                         <StackPanel>
                                             <TextBlock Text="视频" FontSize="15" FontWeight="SemiBold" Foreground="White"/>
-                                            <TextBlock x:Name="DetailVideoText" Foreground="White" FontSize="13" LineHeight="22" Margin="0,8,22,0"/>
+                                            <TextBlock x:Name="DetailVideoText" Foreground="#FFBDBDC2" FontSize="13" LineHeight="23" Margin="0,8,22,0"/>
                                         </StackPanel>
                                         <StackPanel Grid.Column="1">
                                             <TextBlock Text="文件 / 播放能力" FontSize="15" FontWeight="SemiBold" Foreground="White"/>
-                                            <TextBlock x:Name="DetailTechnicalText" Foreground="White" FontSize="13" LineHeight="22" Margin="0,8,0,0" TextWrapping="Wrap"/>
+                                            <TextBlock x:Name="DetailTechnicalText" Foreground="#FFBDBDC2" FontSize="13" LineHeight="23" Margin="0,8,0,0" TextWrapping="Wrap"/>
                                         </StackPanel>
                                     </Grid>
                                 </Border>
@@ -423,8 +690,8 @@
                                         <ItemsControl x:Name="DetailAudioItemsControl">
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
-                                                    <Border Background="#10FFFFFF" BorderBrush="#24FFFFFF" BorderThickness="1" CornerRadius="12" Padding="13,10" Margin="0,0,0,8">
-                                                        <StackPanel><TextBlock Text="{Binding Title}" FontWeight="Bold" Foreground="White"/><TextBlock Text="{Binding Subtitle}" Foreground="#9FFFFFFF" FontSize="12" Margin="0,3,0,0"/></StackPanel>
+                                                    <Border Background="#A8101721" BorderBrush="#22FFFFFF" BorderThickness="1" CornerRadius="12" Padding="14,11" Margin="0,0,0,8">
+                                                        <StackPanel><TextBlock Text="{Binding Title}" FontWeight="SemiBold" Foreground="White"/><TextBlock Text="{Binding Subtitle}" Foreground="#FF909096" FontSize="12" Margin="0,3,0,0"/></StackPanel>
                                                     </Border>
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>
@@ -435,8 +702,8 @@
                                         <ItemsControl x:Name="DetailSubtitleItemsControl">
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
-                                                    <Border Background="#10FFFFFF" BorderBrush="#24FFFFFF" BorderThickness="1" CornerRadius="12" Padding="13,10" Margin="0,0,0,8">
-                                                        <StackPanel><TextBlock Text="{Binding Title}" FontWeight="Bold" Foreground="White"/><TextBlock Text="{Binding Subtitle}" Foreground="#9FFFFFFF" FontSize="12" Margin="0,3,0,0"/></StackPanel>
+                                                    <Border Background="#A8101721" BorderBrush="#22FFFFFF" BorderThickness="1" CornerRadius="12" Padding="14,11" Margin="0,0,0,8">
+                                                        <StackPanel><TextBlock Text="{Binding Title}" FontWeight="SemiBold" Foreground="White"/><TextBlock Text="{Binding Subtitle}" Foreground="#FF909096" FontSize="12" Margin="0,3,0,0"/></StackPanel>
                                                     </Border>
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>
@@ -458,7 +725,7 @@
                                                                 <Grid>
                                                                     <Image Source="pack://application:,,,/Assets/emby.png" Width="38" Height="38" Opacity="0.12"/>
                                                                     <Image Source="{Binding Image}" Stretch="UniformToFill"/>
-                                                                    <Border VerticalAlignment="Bottom" Background="#C8000000" Padding="12,8"><TextBlock Text="{Binding Title}" FontWeight="SemiBold" Foreground="White" TextTrimming="CharacterEllipsis"/></Border>
+                                                                    <Border VerticalAlignment="Bottom" Background="#E6070A0E" Padding="12,9"><TextBlock Text="{Binding Title}" FontWeight="SemiBold" Foreground="White" TextTrimming="CharacterEllipsis"/></Border>
                                                                 </Grid>
                                                             </Border>
                                                             <TextBlock Text="{Binding Subtitle}" Foreground="#9FFFFFFF" FontSize="12" Margin="2,7,2,0" TextTrimming="CharacterEllipsis"/>
@@ -477,8 +744,8 @@
                                         <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
-                                                <Border Background="#13FFFFFF" BorderBrush="#2FFFFFFF" BorderThickness="1" CornerRadius="13" Padding="13,9" Margin="0,0,9,9">
-                                                    <StackPanel Orientation="Horizontal"><TextBlock Text="{Binding Name}" Foreground="White"/><TextBlock Text="{Binding TimeText}" Foreground="White" Margin="8,0,0,0"/></StackPanel>
+                                                <Border Background="#12101721" BorderBrush="#26FFFFFF" BorderThickness="1" CornerRadius="13" Padding="14,9" Margin="0,0,9,9">
+                                                    <StackPanel Orientation="Horizontal"><TextBlock Text="{Binding Name}" Foreground="#FFE4EAF0"/><TextBlock Text="{Binding TimeText}" Foreground="{StaticResource AccentBrush}" Margin="8,0,0,0"/></StackPanel>
                                                 </Border>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
@@ -497,8 +764,8 @@
                                                         <Border Width="92" Height="92" CornerRadius="18" Background="#16FFFFFF" BorderBrush="#30FFFFFF" BorderThickness="1" ClipToBounds="True" HorizontalAlignment="Left">
                                                             <Grid><Image Source="pack://application:,,,/Assets/emby.png" Width="30" Height="30" Opacity="0.10"/><Image Source="{Binding Image}" Stretch="UniformToFill"/></Grid>
                                                         </Border>
-                                                        <TextBlock Text="{Binding Name}" FontWeight="Bold" Foreground="White" Margin="1,9,0,0" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType" TextOptions.TextHintingMode="Fixed"/>
-                                                        <TextBlock Text="{Binding Role}" Foreground="White" FontSize="11" Margin="1,3,0,0" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType" TextOptions.TextHintingMode="Fixed"/>
+                                                        <TextBlock Text="{Binding Name}" FontWeight="Bold" Foreground="White" Margin="1,9,0,0" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="Grayscale" TextOptions.TextHintingMode="Fixed"/>
+                                                        <TextBlock Text="{Binding Role}" Foreground="#FF85858B" FontSize="11" Margin="1,3,0,0" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="Grayscale" TextOptions.TextHintingMode="Fixed"/>
                                                     </StackPanel>
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>
@@ -519,7 +786,7 @@
                                                             <Border Height="214" Background="#17FFFFFF" BorderBrush="#2EFFFFFF" BorderThickness="1" CornerRadius="14" ClipToBounds="True">
                                                                 <Grid><Image Source="pack://application:,,,/Assets/emby.png" Width="38" Height="38" Opacity="0.12"/><Image Source="{Binding Image}" Stretch="UniformToFill"/></Grid>
                                                             </Border>
-                                                            <TextBlock Text="{Binding Title}" FontWeight="Bold" Foreground="White" Margin="2,8,2,0" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType" TextOptions.TextHintingMode="Fixed"/>
+                                                            <TextBlock Text="{Binding Title}" FontWeight="Bold" Foreground="White" Margin="2,8,2,0" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="Grayscale" TextOptions.TextHintingMode="Fixed"/>
                                                             <TextBlock Text="{Binding Subtitle}" Foreground="White" FontSize="11" Margin="2,3,2,0" TextTrimming="CharacterEllipsis"/>
                                                         </StackPanel>
                                                     </Button>

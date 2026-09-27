@@ -7,7 +7,8 @@ namespace EmbyRemotePlayer.Services;
 public sealed class EmbyApiClient : IDisposable
 {
     public const string ClientName = "Emby Remote Player";
-    public const string ClientVersion = "0.8.2.8";
+    public const string ClientVersion = "0.9.0.1";
+    public const int DefaultHomeRowLimit = 24;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -117,7 +118,30 @@ public sealed class EmbyApiClient : IDisposable
     public async Task<List<EmbyItem>> GetItemsAsync(string? parentId, CancellationToken cancellationToken = default)
     {
         EnsureAuthenticated();
+
+        // Hijack-proxy Emby servers (LongEmby family) expose every unscraped movie as BOTH a
+        // real Movie item and a raw "Folder" shell whose Children endpoint answers 404. A flat
+        // Recursive=false listing therefore floods the grid with unplayable shells, and clicking
+        // one dies at PlaybackInfo (410 Gone) or browse (404). A recursive typed query returns
+        // the real entities directly: Movie,Series keeps movie libraries flat and TV libraries
+        // structured (Series rows drill into Seasons/Episodes afterwards).
         var endpoint = AddQuery($"Users/{EscapePath(UserId!)}/Items", new Dictionary<string, string?>
+        {
+            ["ParentId"] = parentId,
+            ["Recursive"] = "true",
+            ["IncludeItemTypes"] = "Movie,Series,MusicVideo,Trailer",
+            ["SortBy"] = "SortName",
+            ["SortOrder"] = "Ascending",
+            ["Fields"] = ListFields,
+            ["EnableImages"] = "true",
+            ["ImageTypeLimit"] = "1"
+        });
+        var items = (await GetCachedJsonAsync<ItemsResult>(endpoint, CachePolicy.Browse, cancellationToken).ConfigureAwait(false)).Items;
+        if (items.Count > 0 || parentId is null) return items;
+
+        // Plain Folder children (scraped series libraries) may legitimately return zero typed
+        // entries; fall back to the unfiltered listing so Season/Folder structures survive.
+        var fallback = AddQuery($"Users/{EscapePath(UserId!)}/Items", new Dictionary<string, string?>
         {
             ["ParentId"] = parentId,
             ["Recursive"] = "false",
@@ -127,7 +151,7 @@ public sealed class EmbyApiClient : IDisposable
             ["EnableImages"] = "true",
             ["ImageTypeLimit"] = "1"
         });
-        return (await GetCachedJsonAsync<ItemsResult>(endpoint, CachePolicy.Browse, cancellationToken).ConfigureAwait(false)).Items;
+        return (await GetCachedJsonAsync<ItemsResult>(fallback, CachePolicy.Browse, cancellationToken).ConfigureAwait(false)).Items;
     }
 
     public async Task<List<EmbyItem>> GetSeasonsAsync(string seriesId, CancellationToken cancellationToken = default)
@@ -316,6 +340,27 @@ public sealed class EmbyApiClient : IDisposable
         return GetCachedJsonAsync<EmbyItem>($"Users/{EscapePath(UserId!)}/Items/{EscapePath(itemId)}", CachePolicy.Detail, cancellationToken);
     }
 
+    /// <summary>
+    /// Direct-playable videos beneath any container, in server-recommended order. Used to
+    /// resolve Folder shells to real movies on hijack proxies whose Children endpoints 404.
+    /// </summary>
+    public async Task<List<EmbyItem>> GetPlayableChildrenAsync(string parentId, CancellationToken cancellationToken = default)
+    {
+        EnsureAuthenticated();
+        var endpoint = AddQuery($"Users/{EscapePath(UserId!)}/Items", new Dictionary<string, string?>
+        {
+            ["ParentId"] = parentId,
+            ["Recursive"] = "true",
+            ["IncludeItemTypes"] = "Movie,Episode,Video,MusicVideo,Trailer",
+            ["SortBy"] = "SortName",
+            ["SortOrder"] = "Ascending",
+            ["Limit"] = "10",
+            ["Fields"] = ListFields + ",MediaSources",
+            ["EnableImages"] = "false"
+        });
+        return (await GetCachedJsonAsync<ItemsResult>(endpoint, CachePolicy.Browse, cancellationToken).ConfigureAwait(false)).Items;
+    }
+
     public async Task<List<EmbyItem>> GetSimilarItemsAsync(string itemId, int limit = 12, CancellationToken cancellationToken = default)
     {
         EnsureAuthenticated();
@@ -328,6 +373,92 @@ public sealed class EmbyApiClient : IDisposable
             ["ImageTypeLimit"] = "1"
         });
         return (await GetCachedJsonAsync<ItemsResult>(endpoint, CachePolicy.Similar, cancellationToken).ConfigureAwait(false)).Items;
+    }
+
+    /// <summary>Episodes the user should watch next (finished S01E03 → suggests S01E04).</summary>
+    public async Task<List<EmbyItem>> GetNextUpAsync(int limit = DefaultHomeRowLimit, CancellationToken cancellationToken = default)
+    {
+        EnsureAuthenticated();
+        var clampedLimit = Math.Clamp(limit, 1, 50);
+        return (await GetCachedJsonAsync<ItemsResult>(BuildNextUpEndpoint(clampedLimit), CachePolicy.NextUp, cancellationToken).ConfigureAwait(false)).Items;
+    }
+
+    private string BuildNextUpEndpoint(int limit) => AddQuery("Shows/NextUp", new Dictionary<string, string?>
+    {
+        ["UserId"] = UserId,
+        ["Limit"] = limit.ToString(),
+        ["Fields"] = EpisodeFields + ",Overview",
+        ["EnableImages"] = "true",
+        ["ImageTypeLimit"] = "1"
+    });
+
+    public async Task<List<EmbyItem>> GetSuggestionsAsync(int limit = 16, CancellationToken cancellationToken = default)
+    {
+        EnsureAuthenticated();
+        var clampedLimit = Math.Clamp(limit, 1, 40);
+        return (await GetCachedJsonAsync<ItemsResult>(BuildSuggestionsEndpoint(clampedLimit), CachePolicy.Similar, cancellationToken).ConfigureAwait(false)).Items;
+    }
+
+    private string BuildSuggestionsEndpoint(int limit) => AddQuery($"Users/{EscapePath(UserId!)}/Suggestions", new Dictionary<string, string?>
+    {
+        ["IncludeItemTypes"] = "Movie,Series",
+        ["Limit"] = limit.ToString(),
+        ["Fields"] = HomeFields,
+        ["EnableImages"] = "true",
+        ["ImageTypeLimit"] = "1"
+    });
+
+    public async Task<List<EmbyItem>> GetTopRatedAsync(int limit = 20, CancellationToken cancellationToken = default)
+    {
+        EnsureAuthenticated();
+        var clampedLimit = Math.Clamp(limit, 1, 50);
+        return (await GetCachedJsonAsync<ItemsResult>(BuildTopRatedEndpoint(clampedLimit), CachePolicy.Browse, cancellationToken).ConfigureAwait(false)).Items;
+    }
+
+    private string BuildTopRatedEndpoint(int limit) => AddQuery($"Users/{EscapePath(UserId!)}/Items", new Dictionary<string, string?>
+    {
+        ["Recursive"] = "true",
+        ["IncludeItemTypes"] = "Movie,Series",
+        ["SortBy"] = "CommunityRating",
+        ["SortOrder"] = "Descending",
+        ["MinCommunityRating"] = "7",
+        ["Limit"] = limit.ToString(),
+        ["Fields"] = HomeFields,
+        ["EnableImages"] = "true",
+        ["ImageTypeLimit"] = "1"
+    });
+
+    public async Task<List<EmbyItem>> GetGenresAsync(CancellationToken cancellationToken = default)
+    {
+        EnsureAuthenticated();
+        var endpoint = AddQuery("Genres", new Dictionary<string, string?>
+        {
+            ["UserId"] = UserId,
+            ["Recursive"] = "true",
+            ["IncludeItemTypes"] = "Movie,Series",
+            ["SortBy"] = "SortName",
+            ["SortOrder"] = "Ascending"
+        });
+        return (await GetCachedJsonAsync<ItemsResult>(endpoint, CachePolicy.Library, cancellationToken).ConfigureAwait(false)).Items;
+    }
+
+    public async Task<List<EmbyItem>> GetItemsByGenreAsync(string genreName, int limit = 20, CancellationToken cancellationToken = default)
+    {
+        EnsureAuthenticated();
+        var clampedLimit = Math.Clamp(limit, 1, 50);
+        var endpoint = AddQuery($"Users/{EscapePath(UserId!)}/Items", new Dictionary<string, string?>
+        {
+            ["Genres"] = genreName,
+            ["Recursive"] = "true",
+            ["IncludeItemTypes"] = "Movie,Series",
+            ["SortBy"] = "CommunityRating",
+            ["SortOrder"] = "Descending",
+            ["Limit"] = clampedLimit.ToString(),
+            ["Fields"] = HomeFields,
+            ["EnableImages"] = "true",
+            ["ImageTypeLimit"] = "1"
+        });
+        return (await GetCachedJsonAsync<ItemsResult>(endpoint, CachePolicy.Browse, cancellationToken).ConfigureAwait(false)).Items;
     }
 
     public async Task<PlaybackInfoResponse> GetPlaybackInfoAsync(string itemId, long startTimeTicks = 0, CancellationToken cancellationToken = default)
@@ -355,9 +486,36 @@ public sealed class EmbyApiClient : IDisposable
             using var response = await SendAsync(request, false, cancellationToken).ConfigureAwait(false);
             return await ReadJsonResponseAsync<PlaybackInfoResponse>(response, cancellationToken).ConfigureAwait(false);
         }
-        catch (EmbyApiException ex) when (ex.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.NotFound or HttpStatusCode.MethodNotAllowed)
+        catch (EmbyApiException ex) when (ex.StatusCode is HttpStatusCode.BadRequest
+                                                or HttpStatusCode.NotFound
+                                                or HttpStatusCode.MethodNotAllowed
+                                                or HttpStatusCode.Gone)
         {
-            return await GetJsonAsync<PlaybackInfoResponse>(endpoint, true, cancellationToken).ConfigureAwait(false);
+            // A number of Emby-compatible reverse proxies only hijack the legacy GET
+            // PlaybackInfo request. Their POST endpoint deliberately answers 410 Gone
+            // ("hijack playback required"), so retry the same negotiation as GET.
+            try
+            {
+                return await GetJsonAsync<PlaybackInfoResponse>(endpoint, true, cancellationToken).ConfigureAwait(false);
+            }
+            catch (EmbyApiException fallbackError) when (fallbackError.StatusCode is HttpStatusCode.BadRequest
+                                                               or HttpStatusCode.NotFound
+                                                               or HttpStatusCode.MethodNotAllowed
+                                                               or HttpStatusCode.Gone)
+            {
+                // Some proxies reject both PlaybackInfo shapes even though the hydrated
+                // item already contains fully usable MediaSources. Preserve direct play
+                // instead of failing before LibVLC receives a URL.
+                var item = await GetItemAsync(itemId, cancellationToken).ConfigureAwait(false);
+                if (item.MediaSources is not { Count: > 0 }) throw;
+
+                LogService.Warning($"PlaybackInfo negotiation was rejected for {itemId}; using media sources from item metadata.", fallbackError);
+                return new PlaybackInfoResponse
+                {
+                    MediaSources = item.MediaSources,
+                    PlaySessionId = Guid.NewGuid().ToString("N")
+                };
+            }
         }
     }
 
@@ -418,24 +576,208 @@ public sealed class EmbyApiClient : IDisposable
         return MakeUri(resolved);
     }
 
+    /// <summary>
+    /// Reads only a small, bounded portion of a media endpoint. Keeping this check outside
+    /// LibVLC lets the UI distinguish a rejected/empty server stream from a local decoder error.
+    /// </summary>
+    public async Task<MediaProbeResult> ProbeMediaUriAsync(
+        Uri uri,
+        IReadOnlyDictionary<string, string>? requiredHeaders = null,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureAuthenticated();
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(9));
+
+        try
+        {
+            return await ProbeMediaUriCoreAsync(uri, requiredHeaders, 0, timeout.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return new MediaProbeResult(false, null, "媒体服务器响应超时", "连接或上游片源在 9 秒内没有返回媒体数据。", true);
+        }
+        catch (HttpRequestException ex)
+        {
+            return new MediaProbeResult(false, null, "无法连接媒体地址", ex.Message, true);
+        }
+        catch (Exception ex)
+        {
+            return new MediaProbeResult(false, null, "媒体地址检查失败", ex.Message, false);
+        }
+    }
+
+    private async Task<MediaProbeResult> ProbeMediaUriCoreAsync(
+        Uri uri,
+        IReadOnlyDictionary<string, string>? requiredHeaders,
+        int playlistDepth,
+        CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+        request.Headers.Range = new RangeHeaderValue(0, 131071);
+        if (string.Equals(uri.Host, ServerBaseUri.Host, StringComparison.OrdinalIgnoreCase))
+        {
+            var auth = $"MediaBrowser Client=\"{ClientName}\", Device=\"Windows\", DeviceId=\"{DeviceId}\", Version=\"{ClientVersion}\", Token=\"{AccessToken}\"";
+            request.Headers.TryAddWithoutValidation("X-Emby-Authorization", auth);
+            request.Headers.TryAddWithoutValidation("Authorization", auth);
+            request.Headers.TryAddWithoutValidation("X-Emby-Token", AccessToken);
+            request.Headers.TryAddWithoutValidation("X-MediaBrowser-Token", AccessToken);
+        }
+        ApplyRequiredProbeHeaders(request, requiredHeaders);
+
+        using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+        var statusCode = (int)response.StatusCode;
+        var contentType = response.Content.Headers.ContentType?.MediaType ?? string.Empty;
+        var bytes = await ReadAtMostAsync(response.Content, 131072, cancellationToken).ConfigureAwait(false);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var detail = TryReadText(bytes, contentType);
+            if (string.IsNullOrWhiteSpace(detail)) detail = response.ReasonPhrase ?? "服务器拒绝了媒体请求。";
+            return new MediaProbeResult(false, statusCode, $"服务器返回 HTTP {statusCode}", detail, true);
+        }
+
+        var looksLikePlaylist = uri.AbsolutePath.EndsWith(".m3u8", StringComparison.OrdinalIgnoreCase)
+                                || contentType.Contains("mpegurl", StringComparison.OrdinalIgnoreCase);
+        if (looksLikePlaylist)
+        {
+            var playlist = Encoding.UTF8.GetString(bytes);
+            if (!playlist.Contains("#EXTM3U", StringComparison.OrdinalIgnoreCase))
+            {
+                return new MediaProbeResult(false, statusCode, "服务器返回的不是有效 HLS 清单",
+                    CompactResponseText(playlist), true);
+            }
+
+            var child = playlist.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
+                .Select(line => line.Trim())
+                .FirstOrDefault(line => !line.StartsWith('#') && !string.IsNullOrWhiteSpace(line));
+            if (string.IsNullOrWhiteSpace(child))
+            {
+                return new MediaProbeResult(false, statusCode, "HLS 清单没有媒体分片",
+                    "Emby 已返回播放清单，但清单中没有可读取的视频轨或分片。", true);
+            }
+
+            if (playlistDepth >= 3)
+                return new MediaProbeResult(false, statusCode, "HLS 清单层级异常", "播放清单连续嵌套且没有找到媒体分片。", true);
+
+            var childUri = new Uri(uri, child);
+            var childResult = await ProbeMediaUriCoreAsync(childUri, requiredHeaders, playlistDepth + 1, cancellationToken).ConfigureAwait(false);
+            return childResult.Success
+                ? childResult with { Summary = "服务器已返回 HLS 媒体分片" }
+                : childResult;
+        }
+
+        if (bytes.Length == 0)
+            return new MediaProbeResult(false, statusCode, "媒体响应为空", "服务器返回成功状态，但没有返回任何媒体字节。", true);
+
+        if (contentType.StartsWith("text/", StringComparison.OrdinalIgnoreCase)
+            || contentType.Contains("json", StringComparison.OrdinalIgnoreCase)
+            || contentType.Contains("html", StringComparison.OrdinalIgnoreCase))
+        {
+            return new MediaProbeResult(false, statusCode, "媒体地址返回了文本错误页",
+                CompactResponseText(Encoding.UTF8.GetString(bytes)), true);
+        }
+
+        return new MediaProbeResult(true, statusCode, $"服务器媒体数据正常（HTTP {statusCode}）",
+            $"已读取 {bytes.Length / 1024d:0.#} KB 媒体数据。", false);
+    }
+
+    private static void ApplyRequiredProbeHeaders(HttpRequestMessage request, IReadOnlyDictionary<string, string>? headers)
+    {
+        if (headers is null) return;
+        foreach (var pair in headers)
+        {
+            if (string.IsNullOrWhiteSpace(pair.Key) || string.IsNullOrWhiteSpace(pair.Value)) continue;
+            request.Headers.TryAddWithoutValidation(pair.Key, pair.Value);
+        }
+    }
+
+    private static async Task<byte[]> ReadAtMostAsync(HttpContent content, int limit, CancellationToken cancellationToken)
+    {
+        await using var stream = await content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        using var buffer = new MemoryStream(Math.Min(limit, 32768));
+        var block = new byte[16384];
+        while (buffer.Length < limit)
+        {
+            var wanted = (int)Math.Min(block.Length, limit - buffer.Length);
+            var read = await stream.ReadAsync(block.AsMemory(0, wanted), cancellationToken).ConfigureAwait(false);
+            if (read == 0) break;
+            buffer.Write(block, 0, read);
+        }
+        return buffer.ToArray();
+    }
+
+    private static string TryReadText(byte[] bytes, string contentType)
+    {
+        if (bytes.Length == 0) return string.Empty;
+        if (!contentType.StartsWith("text/", StringComparison.OrdinalIgnoreCase)
+            && !contentType.Contains("json", StringComparison.OrdinalIgnoreCase)
+            && !contentType.Contains("html", StringComparison.OrdinalIgnoreCase))
+            return string.Empty;
+        return CompactResponseText(Encoding.UTF8.GetString(bytes));
+    }
+
+    private static string CompactResponseText(string value)
+    {
+        var compact = Regex.Replace(value, @"\s+", " ").Trim();
+        if (compact.Length > 260) compact = compact[..260] + "…";
+        return compact;
+    }
+
     public async Task<byte[]> DownloadImageAsync(string itemId, string imageType, string? tag, int maxWidth, CancellationToken cancellationToken = default)
     {
         EnsureAuthenticated();
-        var endpoint = AddQuery($"Items/{EscapePath(itemId)}/Images/{EscapePath(imageType)}", new Dictionary<string, string?>
+        var baseEndpoint = $"Items/{EscapePath(itemId)}/Images/{EscapePath(imageType)}";
+        var endpoints = new List<string>
         {
-            ["tag"] = tag,
+            AddQuery(baseEndpoint, new Dictionary<string, string?>
+            {
+                ["tag"] = tag,
+                ["maxWidth"] = maxWidth.ToString(),
+                ["quality"] = "82",
+                ["api_key"] = AccessToken
+            })
+        };
+
+        // Proxy/image-enhancer implementations occasionally throw 500 when a tag is
+        // supplied, while the canonical untagged or indexed image route still works.
+        if (!string.IsNullOrWhiteSpace(tag))
+        {
+            endpoints.Add(AddQuery(baseEndpoint, new Dictionary<string, string?>
+            {
+                ["maxWidth"] = maxWidth.ToString(),
+                ["quality"] = "82",
+                ["api_key"] = AccessToken
+            }));
+        }
+        endpoints.Add(AddQuery($"{baseEndpoint}/0", new Dictionary<string, string?>
+        {
             ["maxWidth"] = maxWidth.ToString(),
-            ["quality"] = "82"
-        });
-        using var request = CreateRequest(HttpMethod.Get, endpoint, true);
-        request.Headers.Accept.Clear();
-        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("image/*"));
-        // Images are non-critical decoration: never retry them. Retrying amplified every 5xx
-        // on flaky shared servers into three requests, and the card pipeline already has
-        // fallback artwork plus negative caching to degrade gracefully.
-        using var response = await SendAsync(request, false, cancellationToken).ConfigureAwait(false);
-        await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
-        return await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
+            ["quality"] = "82",
+            ["api_key"] = AccessToken
+        }));
+
+        for (var index = 0; index < endpoints.Count; index++)
+        {
+            using var request = CreateRequest(HttpMethod.Get, endpoints[index], true);
+            request.Headers.Accept.Clear();
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("image/*"));
+            using var response = await SendAsync(request, false, cancellationToken).ConfigureAwait(false);
+
+            if (response.IsSuccessStatusCode)
+                return await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
+
+            var canTryCompatibleRoute = index < endpoints.Count - 1
+                                        && (response.StatusCode == HttpStatusCode.InternalServerError
+                                            || response.StatusCode == HttpStatusCode.BadGateway
+                                            || response.StatusCode == HttpStatusCode.ServiceUnavailable
+                                            || response.StatusCode == HttpStatusCode.GatewayTimeout);
+            if (canTryCompatibleRoute) continue;
+
+            await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
+        }
+
+        throw new EmbyApiException("服务器没有返回可用的图片数据。");
     }
 
     public Task ReportPlaybackStartedAsync(PlaybackReport report, CancellationToken cancellationToken = default) =>
@@ -534,6 +876,12 @@ public sealed class EmbyApiClient : IDisposable
             return MakeUri(url);
         }
 
+        // Generic HLS fallback. A realtime server transcode must actually keep up with playback:
+        // asking for 40 Mbps 4K H.264 was beyond most CPUs and produced segments slower than
+        // playback consumed them, i.e. permanent buffering. Cap the fallback at a value the
+        // server can encode in real time; the user's MaxStreamingBitrate still governs when
+        // the server itself negotiated the transcode URL.
+        var transcodeBitrate = Math.Min(_maxStreamingBitrate, 20_000_000);
         var endpoint = AddQuery($"Videos/{EscapePath(item.Id)}/master.m3u8", new Dictionary<string, string?>
         {
             ["MediaSourceId"] = source.Id ?? item.Id,
@@ -542,7 +890,7 @@ public sealed class EmbyApiClient : IDisposable
             ["Container"] = "ts",
             ["VideoCodec"] = "h264",
             ["AudioCodec"] = "aac",
-            ["VideoBitRate"] = _maxStreamingBitrate.ToString(),
+            ["VideoBitRate"] = transcodeBitrate.ToString(),
             ["AudioBitRate"] = "320000",
             ["MaxAudioChannels"] = "8",
             ["MaxWidth"] = "3840",
@@ -558,8 +906,11 @@ public sealed class EmbyApiClient : IDisposable
 
     private DeviceProfile CreateDeviceProfile() => new()
     {
+        // MaxStaticBitrate is the server's DirectStream/DirectPlay gate. Reporting a hardcoded
+        // 120 Mbps told the server any 4K remux was safe to send as-is, which starved slower
+        // links into endless buffering. Tie it to the user's negotiated ceiling instead.
         MaxStreamingBitrate = _maxStreamingBitrate,
-        MaxStaticBitrate = 120_000_000,
+        MaxStaticBitrate = _maxStreamingBitrate,
         DirectPlayProfiles =
         [
             new() { Container = "mkv,mp4,m4v,mov,webm,avi,ts,m2ts,mpg,mpeg,wmv,flv,ogm,ogg", Type = "Video" },
@@ -594,6 +945,10 @@ public sealed class EmbyApiClient : IDisposable
             ["Fields"] = ListFields, ["EnableImages"] = "true", ["ImageTypeLimit"] = "1"
         });
         _responseCache.MarkStale(resumeEndpoint);
+
+        // Next-up suggestions and personalized recommendations shift after playback reports.
+        _responseCache.MarkStale(BuildNextUpEndpoint(DefaultHomeRowLimit));
+        _responseCache.MarkStale(BuildSuggestionsEndpoint(16));
 
         var resumeFallback = AddQuery($"Users/{EscapePath(UserId!)}/Items", new Dictionary<string, string?>
         {
@@ -655,6 +1010,8 @@ public sealed class EmbyApiClient : IDisposable
             ["Fields"] = ListFields, ["EnableImages"] = "true", ["ImageTypeLimit"] = "1"
         });
         cache.MarkStale(resumeEndpoint);
+        cache.MarkStale(BuildNextUpEndpoint(DefaultHomeRowLimit));
+        cache.MarkStale(BuildSuggestionsEndpoint(16));
 
         var resumeFallback = AddQuery($"Users/{EscapePath(UserId!)}/Items", new Dictionary<string, string?>
         {
@@ -742,6 +1099,18 @@ public sealed class EmbyApiClient : IDisposable
             _responseCache.Warm(latestEndpoint, CachePolicy.Latest.FreshFor, CachePolicy.Latest.ServeStaleFor,
                 token => GetJsonCoreAsync<List<EmbyItem>>(latestEndpoint, true, token));
         }
+
+        var nextUpEndpoint = BuildNextUpEndpoint(DefaultHomeRowLimit);
+        _responseCache.Warm(nextUpEndpoint, CachePolicy.NextUp.FreshFor, CachePolicy.NextUp.ServeStaleFor,
+            token => GetJsonCoreAsync<ItemsResult>(nextUpEndpoint, true, token));
+
+        var suggestionsEndpoint = BuildSuggestionsEndpoint(16);
+        _responseCache.Warm(suggestionsEndpoint, CachePolicy.Similar.FreshFor, CachePolicy.Similar.ServeStaleFor,
+            token => GetJsonCoreAsync<ItemsResult>(suggestionsEndpoint, true, token));
+
+        var topRatedEndpoint = BuildTopRatedEndpoint(20);
+        _responseCache.Warm(topRatedEndpoint, CachePolicy.Browse.FreshFor, CachePolicy.Browse.ServeStaleFor,
+            token => GetJsonCoreAsync<ItemsResult>(topRatedEndpoint, true, token));
     }
 
     private Task<T> GetCachedJsonAsync<T>(string endpoint, CachePolicy policy, CancellationToken cancellationToken)
@@ -945,11 +1314,13 @@ public sealed class EmbyApiClient : IDisposable
         public static readonly CachePolicy Search = new(TimeSpan.FromMinutes(2), TimeSpan.FromMinutes(30));
         public static readonly CachePolicy Detail = new(TimeSpan.FromMinutes(30), TimeSpan.FromDays(2));
         public static readonly CachePolicy Similar = new(TimeSpan.FromHours(2), TimeSpan.FromDays(2));
+        public static readonly CachePolicy NextUp = new(TimeSpan.FromMinutes(5), TimeSpan.FromHours(2));
     }
 
     // List/card requests deliberately avoid MediaSources and MediaStreams.
     // Playback stream metadata is large and is fetched only when a detail/play action actually needs it.
     private const string ListFields = "PrimaryImageAspectRatio,Genres,RunTimeTicks,UserData,ChildCount,DateCreated,ProductionYear,CommunityRating";
+    private const string HomeFields = ListFields + ",Overview";
     private const string EpisodeFields = "PrimaryImageAspectRatio,RunTimeTicks,UserData,ProductionYear,DateCreated,SeriesId,SeriesName,SeasonId,SeasonName,ParentIndexNumber,IndexNumber";
 }
 
@@ -962,3 +1333,10 @@ public sealed class EmbyApiException : Exception
 
     public HttpStatusCode? StatusCode { get; }
 }
+
+public sealed record MediaProbeResult(
+    bool Success,
+    int? StatusCode,
+    string Summary,
+    string Detail,
+    bool ServerOrUpstreamFailure);

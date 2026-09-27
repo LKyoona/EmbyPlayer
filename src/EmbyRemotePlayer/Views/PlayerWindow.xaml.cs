@@ -79,6 +79,13 @@ public partial class PlayerWindow : Window
     private int _activeNetworkCachingMilliseconds;
     private bool _defaultExternalSubtitleAttached;
     private int _loadingGeneration;
+    private Uri? _activeMediaUri;
+    private int _mediaGeneration;
+    private int _deferredFailureGeneration = -1;
+    private DateTime _acceptFailureEventsAfterUtc;
+    private bool _probeRecoveryAttempted;
+    private readonly Queue<string> _recentVlcErrors = new();
+    private readonly object _vlcErrorGate = new();
 
     // Live stream telemetry is sampled from LibVLC's cumulative media read statistics.
     // We deliberately compute bytes/second ourselves so the UI can display familiar KB/s / MB/s.
@@ -103,6 +110,7 @@ public partial class PlayerWindow : Window
             ? new[] { "--avcodec-hw=any", "--no-video-title-show", "--http-reconnect" }
             : new[] { "--avcodec-hw=none", "--no-video-title-show", "--http-reconnect" };
         _libVlc = new LibVLC(vlcArgs);
+        _libVlc.Log += LibVlc_Log;
         _mediaPlayer = new VlcMediaPlayer(_libVlc)
         {
             NetworkCaching = checked((uint)Math.Max(0, settings.NetworkCachingMilliseconds)),
@@ -121,7 +129,9 @@ public partial class PlayerWindow : Window
 
         _uiTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(250), DispatcherPriority.Background, UiTimer_Tick, Dispatcher);
         _reportTimer = new DispatcherTimer(TimeSpan.FromSeconds(10), DispatcherPriority.Background, ReportTimer_Tick, Dispatcher);
-        _startupTimer = new DispatcherTimer(TimeSpan.FromSeconds(18), DispatcherPriority.Background, StartupTimer_Tick, Dispatcher);
+        // 10s is enough to distinguish "server is slow" from "stream will never start"; 18s
+        // only stretched the visible dead time before the recovery chain kicked in.
+        _startupTimer = new DispatcherTimer(TimeSpan.FromSeconds(10), DispatcherPriority.Background, StartupTimer_Tick, Dispatcher);
         // 60 Hz input polling keeps native LibVLC HWND clicks feeling immediate without tying playback
         // feedback to the slower metadata/UI refresh timer.
         _cursorTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(16), DispatcherPriority.Input, CursorTimer_Tick, Dispatcher);
@@ -153,7 +163,7 @@ public partial class PlayerWindow : Window
         if (width <= 0 || height <= 0) return;
         var compact = width < 1180 || height < 700;
         var spacious = width >= 1800 && height >= 950;
-        ControlsPanel.Margin = compact ? new Thickness(18, 0, 18, 8) : spacious ? new Thickness(44, 0, 44, 16) : new Thickness(32, 0, 32, 10);
+        ControlsPanel.Margin = compact ? new Thickness(18, 0, 18, 12) : spacious ? new Thickness(34, 0, 34, 24) : new Thickness(24, 0, 24, 18);
         TitleBarPanel.Margin = compact ? new Thickness(12, 2, 12, 0) : spacious ? new Thickness(28, 8, 28, 0) : new Thickness(18, 4, 18, 0);
         VolumeSlider.Width = compact ? 112 : spacious ? 156 : 142;
         TitleText.FontSize = compact ? 16 : spacious ? 20 : 18;
@@ -225,6 +235,12 @@ public partial class PlayerWindow : Window
         _bufferingPercent = 0f;
         _activeNetworkCachingMilliseconds = 0;
         _defaultExternalSubtitleAttached = false;
+        _activeMediaUri = null;
+        _mediaGeneration++;
+        _deferredFailureGeneration = -1;
+        _acceptFailureEventsAfterUtc = DateTime.MinValue;
+        _probeRecoveryAttempted = false;
+        lock (_vlcErrorGate) _recentVlcErrors.Clear();
         ResetNetworkTelemetry();
         if (!preserveEpisodeContext)
         {
@@ -263,7 +279,7 @@ public partial class PlayerWindow : Window
             var selected = options.FirstOrDefault(option => MediaSourceMatches(option.Source, _plan.MediaSource))
                            ?? options.FirstOrDefault();
             MediaVersionsComboBox.SelectedItem = selected;
-            MediaVersionsComboBox.Tag = "⇄";
+            MediaVersionsComboBox.Tag = "版本";
             MediaVersionsComboBox.Visibility = options.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
         }
         finally { _updatingMediaVersions = false; }
@@ -342,19 +358,34 @@ public partial class PlayerWindow : Window
 
     private void StartMedia(Uri uri, PlaybackMethod method, long absoluteStartTicks)
     {
+        _mediaGeneration++;
         _playingObserved = false;
         _bufferingPercent = 0f;
         _defaultExternalSubtitleAttached = false;
         ResetNetworkTelemetry();
         ErrorBanner.Visibility = Visibility.Collapsed;
         _startupTimer.Stop();
+        // Stop() can deliver a delayed EndReached/EncounteredError from the previous Media.
+        // Do not let that stale native callback advance the fallback chain for the new stream.
+        _acceptFailureEventsAfterUtc = DateTime.UtcNow.AddMilliseconds(850);
+        _deferredFailureGeneration = -1;
         _mediaPlayer.Stop();
         _media?.Dispose();
-        _media = new Media(_libVlc, uri);
+        // FromLocation explicitly routes through VLC's network access layer. The Uri
+        // convenience overload has historically been ambiguous about file-vs-network
+        // handling and rendered UNC-ish MRLs for http URLs in some 3.x builds.
+        _media = new Media(_libVlc, uri.AbsoluteUri, FromType.FromLocation);
 
         _activeNetworkCachingMilliseconds = GetAdaptiveNetworkCachingMilliseconds(method);
         _media.AddOption($":network-caching={_activeNetworkCachingMilliseconds}");
         _media.AddOption(":http-reconnect");
+        // NOTE: ":http-continuous" is deliberately NOT set. It forces VLC to hold one
+        // persistent connection for the whole file; CDN-fronted Emby proxies (nginx +
+        // hijack edge like LongEmby) close that long-lived range stream after the first
+        // response and VLC then hangs in Opening forever — observed as "cannot play
+        // anything" on 0.9.0.0. http-reconnect already recovers dropped connections.
+        _media.AddOption(":http-forward-cookies");
+        ApplyMediaHttpHeaders(_media);
         if (_forceSoftwareDecode)
         {
             // Per-media override: if a GPU/driver cannot decode this specific file, retry it
@@ -363,6 +394,8 @@ public partial class PlayerWindow : Window
         }
 
         _method = method;
+        _activeMediaUri = uri;
+        lock (_vlcErrorGate) _recentVlcErrors.Clear();
         NetworkDebugService.LogPlayerStream(uri, method.ToString());
         _streamBaseTicks = method == PlaybackMethod.Transcode ? Math.Max(0, absoluteStartTicks) : 0;
         _pendingSeekTicks = method == PlaybackMethod.Transcode ? 0 : Math.Max(0, absoluteStartTicks);
@@ -377,12 +410,55 @@ public partial class PlayerWindow : Window
         _startupTimer.Start();
     }
 
+    private void ApplyMediaHttpHeaders(Media media)
+    {
+        var headers = _plan.MediaSource.RequiredHttpHeaders;
+
+        // IMPORTANT: never default to a browser-shaped User-Agent. CDN-fronted Emby proxies
+        // (LongEmby hijack edge) reject or abruptly close streams whose UA looks like a
+        // browser — the same policy that 402/302s browser playback. Only send a UA when the
+        // media source itself demands one (signed .strm providers), otherwise let VLC's own
+        // identity through: this server accepts it and streams stay alive.
+        var userAgent = GetRequiredHeader(headers, "User-Agent");
+        if (!string.IsNullOrWhiteSpace(userAgent))
+            media.AddOption($":http-user-agent={SanitizeVlcOption(userAgent!)}");
+
+        // Same rule for Referer: only attach when explicitly required by the media source.
+        var referer = GetRequiredHeader(headers, "Referer");
+        if (!string.IsNullOrWhiteSpace(referer))
+            media.AddOption($":http-referrer={SanitizeVlcOption(referer!)}");
+
+        // LibVLC exposes a dedicated option for the header most commonly required
+        // by signed .strm sources. Preserve any Cookie value for providers that
+        // bind the signed stream to the Emby session.
+        var cookie = GetRequiredHeader(headers, "Cookie");
+        if (!string.IsNullOrWhiteSpace(cookie))
+            media.AddOption($":http-cookie={SanitizeVlcOption(cookie)}");
+    }
+
+    private static string? GetRequiredHeader(IReadOnlyDictionary<string, string>? headers, string name)
+    {
+        if (headers is null) return null;
+        foreach (var pair in headers)
+        {
+            if (string.Equals(pair.Key, name, StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(pair.Value))
+                return pair.Value;
+        }
+        return null;
+    }
+
+    private static string SanitizeVlcOption(string value) =>
+        value.Replace("\r", string.Empty, StringComparison.Ordinal)
+             .Replace("\n", string.Empty, StringComparison.Ordinal)
+             .Trim();
+
     private int GetAdaptiveNetworkCachingMilliseconds(PlaybackMethod method)
     {
-        var configured = Math.Clamp(_settings.NetworkCachingMilliseconds, 500, 15000);
-        // VOD on the public internet benefits from a small real prebuffer. Keep direct streams
-        // responsive while giving HLS/transcoded streams a little more headroom.
-        return method == PlaybackMethod.Transcode ? Math.Max(configured, 4500) : Math.Max(configured, 3000);
+        // Respect the user's configured cache window. The previous forced floors (3s direct /
+        // 4.5s transcode) added a fixed multi-second prebuffer on every startup even on fast
+        // links; the setting itself is already clamped to 500-15000 ms.
+        return Math.Clamp(_settings.NetworkCachingMilliseconds, 500, 15000);
     }
 
     private void AttachDefaultExternalSubtitle()
@@ -456,30 +532,30 @@ public partial class PlayerWindow : Window
             {
                 var target = _pendingSeekTicks;
                 _pendingSeekTicks = 0;
-                await Task.Delay(350);
+                await Task.Delay(150);
                 if (!_closing && _method != PlaybackMethod.Transcode) _mediaPlayer.Time = target / TimeSpan.TicksPerMillisecond;
             }
             if (_pauseAfterMediaStart)
             {
                 _pauseAfterMediaStart = false;
-                await Task.Delay(90);
+                await Task.Delay(50);
                 if (!_closing) _mediaPlayer.Pause();
             }
-            await Task.Delay(220);
+            // Fire-and-forget follow-ups; nothing here should delay first video/remote tracks.
             AttachDefaultExternalSubtitle();
             RefreshTracks();
             _ = RefreshTracksLaterAsync();
             if (!_startedReported)
             {
                 _startedReported = true;
-                await ReportStartedSafeAsync();
+                _ = ReportStartedSafeAsync();
             }
         }));
     }
 
     private async Task RefreshTracksLaterAsync()
     {
-        await Task.Delay(1100);
+        await Task.Delay(450);
         if (!_closing) await Dispatcher.InvokeAsync(RefreshTracks);
     }
 
@@ -507,6 +583,27 @@ public partial class PlayerWindow : Window
     private void MediaPlayer_EndReached(object? sender, EventArgs e) => Dispatcher.BeginInvoke(new Action(async () =>
     {
         if (_closing || _switchingEpisode || _switchingMediaSource) return;
+        if (DateTime.UtcNow < _acceptFailureEventsAfterUtc)
+        {
+            DeferStartupFailure("媒体流在开始前意外结束。", _mediaGeneration);
+            return;
+        }
+
+        // LibVLC can report EndReached for a rejected/empty HTTP stream before it ever
+        // reports Playing. Treat that as a startup failure so the recovery chain can
+        // try software decoding and the compatibility stream instead of closing the
+        // player as though a 20-minute episode completed in zero seconds.
+        var currentTicks = GetCurrentPositionTicks();
+        var totalTicks = GetTotalTicks();
+        var reachedRealEnd = totalTicks <= TimeSpan.FromSeconds(30).Ticks
+                             || currentTicks >= totalTicks - TimeSpan.FromSeconds(15).Ticks
+                             || (totalTicks > 0 && currentTicks / (double)totalTicks >= 0.95);
+        if (!_playingObserved || !reachedRealEnd)
+        {
+            await HandlePlaybackFailureAsync("媒体流在开始前意外结束。");
+            return;
+        }
+
         _lastPositionTicks = GetTotalTicks();
         if (_autoPlayNextEpisode && _nextEpisode is not null) await SwitchEpisodeAsync(_nextEpisode);
         else Close();
@@ -515,8 +612,30 @@ public partial class PlayerWindow : Window
     private void MediaPlayer_EncounteredError(object? sender, EventArgs e) => Dispatcher.BeginInvoke(new Action(async () =>
     {
         if (_closing || _switchingMediaSource) return;
+        if (DateTime.UtcNow < _acceptFailureEventsAfterUtc)
+        {
+            DeferStartupFailure("播放器无法读取当前媒体流。", _mediaGeneration);
+            return;
+        }
         await HandlePlaybackFailureAsync("播放器无法读取当前媒体流。");
     }));
+
+    private async void DeferStartupFailure(string reason, int generation)
+    {
+        try
+        {
+            if (_deferredFailureGeneration == generation) return;
+            _deferredFailureGeneration = generation;
+            var remaining = _acceptFailureEventsAfterUtc - DateTime.UtcNow;
+            if (remaining > TimeSpan.Zero) await Task.Delay(remaining + TimeSpan.FromMilliseconds(40));
+            if (_closing || generation != _mediaGeneration || _playingObserved) return;
+            await HandlePlaybackFailureAsync(reason);
+        }
+        catch (Exception ex)
+        {
+            LogService.Warning("DeferStartupFailure failed.", ex);
+        }
+    }
 
     private async void StartupTimer_Tick(object? sender, EventArgs e)
     {
@@ -565,8 +684,20 @@ public partial class PlayerWindow : Window
                 return;
             }
 
+            ShowLoading("正在定位播放故障…", "检查 Emby 清单与首个媒体分片");
+            var diagnosis = await DiagnoseActiveMediaAsync();
+            if (diagnosis.Result.Success && !_probeRecoveryAttempted && _activeMediaUri is not null)
+            {
+                // A successful probe can warm a cold Emby transcoder or refresh a just-created
+                // HLS session. Give that exact stream one controlled retry, never an infinite loop.
+                _probeRecoveryAttempted = true;
+                ShowLoading("媒体源正常，正在重新接管播放…", diagnosis.Result.Summary);
+                StartMedia(_activeMediaUri, _method, resume);
+                return;
+            }
+
             HideLoading();
-            ShowError(reason + "已尝试硬件解码、软件解码和 Emby 兼容流。请打开 F12 网络控制台查看具体媒体错误。");
+            ShowError(BuildPlaybackDiagnosis(reason, diagnosis.Result));
         }
         catch (Exception ex)
         {
@@ -590,6 +721,68 @@ public partial class PlayerWindow : Window
             ShowError(reason + "自动兼容播放失败：" + ex.Message);
         }
         finally { _failureHandling = false; }
+    }
+
+    private async Task<(MediaProbeResult Result, double DurationMs)> DiagnoseActiveMediaAsync()
+    {
+        if (_activeMediaUri is null)
+            return (new MediaProbeResult(false, null, "没有活动媒体地址", "播放器尚未建立媒体请求。", false), 0);
+
+        var started = DateTime.UtcNow;
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var result = await _api.ProbeMediaUriAsync(_activeMediaUri, _plan.MediaSource.RequiredHttpHeaders, timeout.Token);
+        var elapsed = (DateTime.UtcNow - started).TotalMilliseconds;
+        NetworkDebugService.LogPlayerProbe(_activeMediaUri, result, elapsed);
+        LogService.Info($"Media health probe: method={_method}; success={result.Success}; status={result.StatusCode?.ToString() ?? "none"}; summary={result.Summary}");
+        return (result, elapsed);
+    }
+
+    private string BuildPlaybackDiagnosis(string reason, MediaProbeResult probe)
+    {
+        var vlcReason = GetLatestVlcError();
+        if (probe.ServerOrUpstreamFailure)
+        {
+            return $"服务端或上游片源故障：{probe.Summary}。{probe.Detail} " +
+                   "这不是本地显卡或播放器 UI 导致的；请更换媒体版本，或检查 Emby 转码日志与片源可用性。";
+        }
+
+        if (probe.Success)
+        {
+            var detail = string.IsNullOrWhiteSpace(vlcReason) ? reason.Trim() : vlcReason;
+            return $"服务器已正常返回媒体数据，但本地 LibVLC 无法接管播放：{detail} " +
+                   "已完成硬解、软解、兼容流及一次预热重试。";
+        }
+
+        return $"暂时无法判定故障归属：{probe.Summary}。{probe.Detail} " +
+               (string.IsNullOrWhiteSpace(vlcReason) ? reason.Trim() : vlcReason);
+    }
+
+    private void LibVlc_Log(object? sender, LogEventArgs e)
+    {
+        if (e.Level is not (LogLevel.Warning or LogLevel.Error)) return;
+        var message = SanitizeVlcLog($"{e.Module}: {e.Message}");
+        lock (_vlcErrorGate)
+        {
+            _recentVlcErrors.Enqueue(message);
+            while (_recentVlcErrors.Count > 12) _recentVlcErrors.Dequeue();
+        }
+        LogService.Warning($"LibVLC {e.Level}: {message}");
+    }
+
+    private string GetLatestVlcError()
+    {
+        lock (_vlcErrorGate)
+            return _recentVlcErrors.LastOrDefault() ?? string.Empty;
+    }
+
+    private static string SanitizeVlcLog(string value)
+    {
+        var safe = System.Text.RegularExpressions.Regex.Replace(
+            value,
+            @"(?i)(api_key|access_token|token|sig|signature|X-Emby-Token|X-MediaBrowser-Token)\s*=\s*(?:""[^""]*""|[^&,\s]+)",
+            "$1=***");
+        safe = safe.Replace('\r', ' ').Replace('\n', ' ').Trim();
+        return safe.Length > 360 ? safe[..360] + "…" : safe;
     }
 
     private async Task SwitchToCompatibilityTranscodeAsync(long startTicks)
@@ -1215,7 +1408,7 @@ public partial class PlayerWindow : Window
     {
         if (SpeedComboBox.SelectedItem is not SpeedOption option) return;
         _settings.PlaybackSpeed = option.Value;
-        SpeedComboBox.Tag = option.Value == 1.0 ? "1×" : $"{option.Value:0.##}×";
+        SpeedComboBox.Tag = option.Value == 1.0 ? "1.0×" : $"{option.Value:0.##}×";
         if (_settings.RememberPlaybackSpeed) _saveSettings();
         ApplyPlaybackSpeed();
         ShowPlaybackChrome();
@@ -1229,7 +1422,7 @@ public partial class PlayerWindow : Window
     private async void MediaVersionsComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_updatingMediaVersions || _switchingMediaSource || MediaVersionsComboBox.SelectedItem is not MediaSourceOption option) return;
-        MediaVersionsComboBox.Tag = "⇄";
+        MediaVersionsComboBox.Tag = "版本";
         if (MediaSourceMatches(option.Source, _plan.MediaSource)) return;
         await SwitchMediaSourceAsync(option.Source);
     }
@@ -1900,7 +2093,9 @@ public partial class PlayerWindow : Window
     private bool IsScreenPointOverInteractiveChrome(NativePoint screenPoint)
     {
         if (EpisodePanel.Visibility == Visibility.Visible && IsScreenPointOverElement(EpisodePanel, screenPoint)) return true;
-        if (ControlsPanel.Opacity > 0.08 && IsScreenPointOverElement(ControlsPanel, screenPoint, 6)) return true;
+        if (ControlsPanel.Opacity > 0.08
+            && (IsScreenPointOverElement(PositionSlider, screenPoint, 4)
+                || IsScreenPointOverElement(ControlsPanel, screenPoint, 4))) return true;
         if (TitleBarPanel.Opacity > 0.08 && IsScreenPointOverElement(TitleBarPanel, screenPoint, 4)) return true;
         return AudioTracksComboBox.IsDropDownOpen || SubtitleTracksComboBox.IsDropDownOpen || SpeedComboBox.IsDropDownOpen || MediaVersionsComboBox.IsDropDownOpen;
     }
@@ -2495,7 +2690,16 @@ public partial class PlayerWindow : Window
             _episodeLoadCts?.Dispose();
             VideoView.MediaPlayer = null;
             _media?.Dispose();
+            _mediaPlayer.Opening -= MediaPlayer_Opening;
+            _mediaPlayer.Buffering -= MediaPlayer_Buffering;
+            _mediaPlayer.Playing -= MediaPlayer_Playing;
+            _mediaPlayer.Paused -= MediaPlayer_Paused;
+            _mediaPlayer.TimeChanged -= MediaPlayer_TimeChanged;
+            _mediaPlayer.LengthChanged -= MediaPlayer_LengthChanged;
+            _mediaPlayer.EndReached -= MediaPlayer_EndReached;
+            _mediaPlayer.EncounteredError -= MediaPlayer_EncounteredError;
             _mediaPlayer.Dispose();
+            _libVlc.Log -= LibVlc_Log;
             _libVlc.Dispose();
         }
     }
