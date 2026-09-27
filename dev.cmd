@@ -13,8 +13,7 @@ $ProgressPreference = 'SilentlyContinue'
 $root = (Get-Location).Path
 $project = Join-Path $root 'src\EmbyRemotePlayer\EmbyRemotePlayer.csproj'
 $projectDir = Split-Path -Parent $project
-$binExe = Join-Path $projectDir 'bin\Release
-et8.0-windows\EmbyRemotePlayer.exe'
+$binExe = Join-Path $projectDir 'bin\Release\net8.0-windows\EmbyRemotePlayer.exe'
 
 function Invoke-DotNet {
     param(
