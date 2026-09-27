@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:models="clr-namespace:EmbyRemotePlayer.Models"
         xmlns:vm="clr-namespace:EmbyRemotePlayer.ViewModels"
+        xmlns:conv="clr-namespace:EmbyRemotePlayer.Converters"
         Title="Emby Remote · 私人影院" Icon="pack://application:,,,/Assets/emby.ico" Width="1440" Height="900" MinWidth="1000" MinHeight="640"
         WindowStartupLocation="CenterScreen" Closing="Window_Closing" PreviewKeyDown="Window_PreviewKeyDown"
         TextElement.Foreground="White"
@@ -110,7 +111,7 @@
                             <!-- Mismatched-aspect fallback artwork renders complete (Uniform) over a
                                  blurred self-fill; matched posters collapse the blur layer for free. -->
                             <Image Source="{Binding Image}" Stretch="UniformToFill" Opacity="0.45"
-                                   Visibility="{Binding Image, Converter={x:Static vm:ImageAspectMismatchConverter.Instance}, ConverterParameter=0.695}">
+                                   Visibility="{Binding Image, Converter={x:Static conv:ImageAspectMismatchConverter.Instance}, ConverterParameter=0.695}">
                                 <Image.Effect>
                                     <BlurEffect Radius="30" RenderingBias="Performance"/>
                                 </Image.Effect>
@@ -125,12 +126,12 @@
                             </Path>
                             <Border Background="#EA0A0A0C" BorderBrush="#36FFFFFF" BorderThickness="1" CornerRadius="8"
                                     HorizontalAlignment="Right" VerticalAlignment="Top" Margin="10" Padding="8,4"
-                                    Visibility="{Binding Badge, Converter={x:Static vm:StringVisibilityConverter.Instance}}">
+                                    Visibility="{Binding Badge, Converter={x:Static conv:StringVisibilityConverter.Instance}}">
                                 <TextBlock Text="{Binding Badge}" Foreground="White" FontSize="11" FontWeight="SemiBold"/>
                             </Border>
                             <Border Background="#D90E1422" BorderBrush="#500A84FF" BorderThickness="1" CornerRadius="7"
                                     HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10" Padding="8,4"
-                                    Visibility="{Binding TypeBadge, Converter={x:Static vm:StringVisibilityConverter.Instance}}">
+                                    Visibility="{Binding TypeBadge, Converter={x:Static conv:StringVisibilityConverter.Instance}}">
                                 <StackPanel Orientation="Horizontal">
                                     <Ellipse Width="5" Height="5" Fill="{StaticResource AccentBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                                     <TextBlock Text="{Binding TypeBadge}" Foreground="#FFF5F8FA" FontSize="10" FontWeight="SemiBold"/>
@@ -189,7 +190,7 @@
                                 <Polygon Points="2,52 27,21 44,40 57,28 78,52" Fill="#3DFFFFFF"/>
                             </Canvas>
                             <Image Source="{Binding Image}" Stretch="UniformToFill" Opacity="0.45"
-                                   Visibility="{Binding Image, Converter={x:Static vm:ImageAspectMismatchConverter.Instance}, ConverterParameter=1.778}">
+                                   Visibility="{Binding Image, Converter={x:Static conv:ImageAspectMismatchConverter.Instance}, ConverterParameter=1.778}">
                                 <Image.Effect>
                                     <BlurEffect Radius="34" RenderingBias="Performance"/>
                                 </Image.Effect>
@@ -217,7 +218,7 @@
                             </Border>
                             <Border Background="#D90E1422" BorderBrush="#500A84FF" BorderThickness="1" CornerRadius="7"
                                     HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12" Padding="8,4"
-                                    Visibility="{Binding TypeBadge, Converter={x:Static vm:StringVisibilityConverter.Instance}}">
+                                    Visibility="{Binding TypeBadge, Converter={x:Static conv:StringVisibilityConverter.Instance}}">
                                 <StackPanel Orientation="Horizontal">
                                     <Ellipse Width="5" Height="5" Fill="{StaticResource AccentBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                                     <TextBlock Text="{Binding TypeBadge}" Foreground="#FFF5F8FA" FontSize="10" FontWeight="SemiBold"/>
@@ -264,10 +265,10 @@
                         <StackPanel>
                             <TextBlock Text="{Binding Title}" Foreground="White" FontSize="24" FontWeight="Bold"/>
                             <TextBlock Text="{Binding Subtitle}" Foreground="#FF838389" FontSize="12" Margin="0,4,0,0"
-                                       Visibility="{Binding Subtitle, Converter={x:Static vm:StringVisibilityConverter.Instance}}"/>
+                                       Visibility="{Binding Subtitle, Converter={x:Static conv:StringVisibilityConverter.Instance}}"/>
                         </StackPanel>
                         <Border Grid.Column="1" Background="#20FFFFFF" BorderBrush="#2FFFFFFF" BorderThickness="1" CornerRadius="9" Padding="10,5" HorizontalAlignment="Right" VerticalAlignment="Top"
-                                Visibility="{Binding BadgeText, Converter={x:Static vm:StringVisibilityConverter.Instance}}">
+                                Visibility="{Binding BadgeText, Converter={x:Static conv:StringVisibilityConverter.Instance}}">
                             <TextBlock Text="{Binding BadgeText}" Foreground="#FFD0D0D3" FontSize="11"/>
                         </Border>
                     </Grid>
@@ -289,10 +290,10 @@
                         <StackPanel>
                             <TextBlock Text="{Binding Title}" Foreground="White" FontSize="24" FontWeight="Bold"/>
                             <TextBlock Text="{Binding Subtitle}" Foreground="#FF838389" FontSize="12" Margin="0,4,0,0"
-                                       Visibility="{Binding Subtitle, Converter={x:Static vm:StringVisibilityConverter.Instance}}"/>
+                                       Visibility="{Binding Subtitle, Converter={x:Static conv:StringVisibilityConverter.Instance}}"/>
                         </StackPanel>
                         <Border Grid.Column="1" Background="#240A84FF" BorderBrush="#550A84FF" BorderThickness="1" CornerRadius="10" Padding="11,6" VerticalAlignment="Top"
-                                Visibility="{Binding BadgeText, Converter={x:Static vm:StringVisibilityConverter.Instance}}">
+                                Visibility="{Binding BadgeText, Converter={x:Static conv:StringVisibilityConverter.Instance}}">
                             <TextBlock Text="{Binding BadgeText}" Foreground="#FFD6EBFF" FontSize="11" FontWeight="SemiBold"/>
                         </Border>
                     </Grid>

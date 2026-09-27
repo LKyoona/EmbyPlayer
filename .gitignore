@@ -1,6 +1,7 @@
 .vs/
 .idea/
 .zcode/
+artifacts/
 **/bin/
 **/obj/
 publish/

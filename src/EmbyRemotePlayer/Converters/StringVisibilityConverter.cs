@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Windows.Data;
 
-namespace EmbyRemotePlayer.ViewModels;
+namespace EmbyRemotePlayer.Converters;
 
 public sealed class StringVisibilityConverter : IValueConverter
 {

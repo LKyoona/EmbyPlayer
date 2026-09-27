@@ -1,0 +1,59 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "build",
+        "${workspaceFolder}/src/EmbyRemotePlayer/EmbyRemotePlayer.csproj",
+        "-c",
+        "Debug"
+      ],
+      "problemMatcher": "$msCompile",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "watch",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "watch",
+        "--project",
+        "${workspaceFolder}/src/EmbyRemotePlayer/EmbyRemotePlayer.csproj"
+      ],
+      "problemMatcher": "$msCompile",
+      "isBackground": true,
+      "group": "test"
+    },
+    {
+      "label": "pack",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "publish",
+        "${workspaceFolder}/src/EmbyRemotePlayer/EmbyRemotePlayer.csproj",
+        "-c",
+        "Release",
+        "-o",
+        "${workspaceFolder}/dist/app"
+      ],
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "clean",
+      "command": "powershell",
+      "type": "process",
+      "args": [
+        "-NoProfile",
+        "-Command",
+        "Remove-Item -Recurse -Force -ErrorAction SilentlyContinue artifacts, dist; Write-Host 'All artifacts and dist cleared.' -ForegroundColor Green"
+      ],
+      "problemMatcher": []
+    }
+  ]
+}

@@ -13,7 +13,6 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\emby.ico</ApplicationIcon>
     <InvariantGlobalization>false</InvariantGlobalization>
-    <AccelerateBuildsInCli>true</AccelerateBuildsInCli>
   </PropertyGroup>
 
   <ItemGroup>

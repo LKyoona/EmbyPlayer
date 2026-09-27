@@ -1,0 +1,26 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "启动 EmbyRemotePlayer (F5 内存热重载)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/artifacts/bin/EmbyRemotePlayer/debug/EmbyRemotePlayer.exe",
+      "args": [],
+      "cwd": "${workspaceFolder}/artifacts/bin/EmbyRemotePlayer/debug",
+      "stopAtEntry": false,
+      "console": "internalConsole"
+    },
+    {
+      "name": "启动已编译版本 (不触发编译)",
+      "type": "coreclr",
+      "request": "launch",
+      "program": "${workspaceFolder}/artifacts/bin/EmbyRemotePlayer/debug/EmbyRemotePlayer.exe",
+      "args": [],
+      "cwd": "${workspaceFolder}/artifacts/bin/EmbyRemotePlayer/debug",
+      "stopAtEntry": false,
+      "console": "internalConsole"
+    }
+  ]
+}

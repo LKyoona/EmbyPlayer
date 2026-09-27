@@ -1,0 +1,13 @@
+<Project>
+  <PropertyGroup>
+    <!-- .NET 8 官方推荐的集中产物输出模型：所有编译产物统一收归到根目录 artifacts/，彻底避免污染 src/ -->
+    <UseArtifactsOutput>true</UseArtifactsOutput>
+    <ArtifactsPath>$(MSBuildThisFileDirectory)artifacts</ArtifactsPath>
+
+    <!-- 开启 CLI 快速增量构建引擎，跳过无变更的原生依赖全量解包与拷贝 -->
+    <AccelerateBuildsInCli>true</AccelerateBuildsInCli>
+
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+</Project>

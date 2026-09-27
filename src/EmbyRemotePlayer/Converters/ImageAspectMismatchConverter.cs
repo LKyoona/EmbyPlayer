@@ -1,8 +1,7 @@
 using System.Globalization;
 using System.Windows.Data;
-using System.Windows.Media;
 
-namespace EmbyRemotePlayer.ViewModels;
+namespace EmbyRemotePlayer.Converters;
 
 /// <summary>
 /// Returns Visible only when the bound image's aspect ratio does NOT match the card tile,
